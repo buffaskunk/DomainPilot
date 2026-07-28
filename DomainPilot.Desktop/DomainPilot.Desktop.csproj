@@ -8,4 +8,9 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\DomainPilot.App\DomainPilot.App.csproj" />
+    <ProjectReference Include="..\DomainPilot.Infrastructure\DomainPilot.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>

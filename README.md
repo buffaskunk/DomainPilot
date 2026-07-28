@@ -4,6 +4,10 @@ DomainPilot is a Windows desktop prototype for safer Active Directory help desk 
 
 Author and copyright holder: **Rick Linville** (`buffaskunk`)
 
+## Current Status
+
+DomainPilot is in early active development. The public build starts in **Demo Mode**, uses sample data, and does not query or modify the current Active Directory domain. This is especially important because the project is being developed on a work computer with access to a real network.
+
 ## Important Disclaimer
 
 DomainPilot is provided for portfolio, educational, lab, and authorized administrative use only. Active Directory and Windows administration tools can affect user access, security policies, computers, servers, and production environments. By downloading, inspecting, modifying, building, or using this project, you are responsible for understanding the code and testing it safely before use.
@@ -19,6 +23,7 @@ Rick Linville provides this software as-is and is not responsible or liable for 
 - Approved script/action catalog with risk level and required role.
 - Technician-facing environment readiness checklist.
 - Audit log viewer and CSV export.
+- Layered C# architecture with validation tests.
 
 ## Safety Design
 
@@ -42,7 +47,20 @@ From a terminal:
 ```powershell
 dotnet build DomainPilot.sln
 dotnet run --project .\DomainPilot.Desktop\DomainPilot.Desktop.csproj
+dotnet run --project .\DomainPilot.Tests\DomainPilot.Tests.csproj
 ```
+
+## Architecture
+
+DomainPilot is split into focused projects:
+
+- `DomainPilot.Core`: domain models and shared contracts.
+- `DomainPilot.App`: validation, use-case services, and gateway interfaces.
+- `DomainPilot.Infrastructure`: demo gateway and audit logging implementations.
+- `DomainPilot.Desktop`: WPF technician interface.
+- `DomainPilot.Tests`: lightweight validation and safety checks.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/AI_COLLABORATION.md](docs/AI_COLLABORATION.md).
 
 ## Roadmap
 
