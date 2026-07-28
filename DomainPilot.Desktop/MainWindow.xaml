@@ -20,22 +20,34 @@
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="14,9"/>
-            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
+        <Style x:Key="GridTextStyle" TargetType="TextBlock">
+            <Setter Property="Padding" Value="5,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+            <Setter Property="ToolTipService.ShowDuration" Value="60000"/>
+        </Style>
         <Style TargetType="DataGrid">
             <Setter Property="AutoGenerateColumns" Value="False"/>
             <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserResizeColumns" Value="True"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
             <Setter Property="RowHeaderWidth" Value="0"/>
             <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="RowHeight" Value="36"/>
+            <Setter Property="AlternatingRowBackground" Value="#F8FAFC"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
         </Style>
     </Window.Resources>
 
@@ -72,18 +84,22 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <DockPanel Grid.Row="0" Margin="0,0,0,22">
-                <StackPanel>
+            <Grid Grid.Row="0" Margin="0,0,0,22">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,24,0">
                     <TextBlock Text="Active Directory Operations Workspace" FontSize="30" FontWeight="Bold"/>
-                    <TextBlock Text="Bulk user creation, policy readiness, device lookup, script planning, and audit logging for help desk technicians." Foreground="{StaticResource MutedBrush}" FontSize="15" Margin="0,6,0,0"/>
+                    <TextBlock Text="Bulk user creation, policy readiness, device lookup, script planning, and audit logging for help desk technicians." Foreground="{StaticResource MutedBrush}" FontSize="15" TextWrapping="Wrap" Margin="0,6,0,0"/>
                 </StackPanel>
-                <Border DockPanel.Dock="Right" Background="#E7F7F3" BorderBrush="#9DEBD9" BorderThickness="1" Padding="14,10">
+                <Border Grid.Column="1" Background="#E7F7F3" BorderBrush="#9DEBD9" BorderThickness="1" Padding="14,10" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <Ellipse Width="10" Height="10" Fill="#12B76A" Margin="0,0,8,0"/>
                         <TextBlock Text="{Binding EnvironmentStatus}" FontWeight="SemiBold" Foreground="#05603A"/>
                     </StackPanel>
                 </Border>
-            </DockPanel>
+            </Grid>
 
             <TabControl Grid.Row="1" Background="Transparent">
                 <TabItem Header="Dashboard">
@@ -127,12 +143,12 @@
                         <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="20" Margin="0,0,18,0">
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Top" Text="Environment Readiness" FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
-                                <DataGrid ItemsSource="{Binding SetupChecks}">
+                                <DataGrid ItemsSource="{Binding SetupChecks}" IsReadOnly="True">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Area" Binding="{Binding Area}" Width="150"/>
-                                        <DataGridTextColumn Header="Check" Binding="{Binding Requirement}" Width="*"/>
-                                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120"/>
-                                        <DataGridTextColumn Header="Why it matters" Binding="{Binding HelpText}" Width="260"/>
+                                        <DataGridTextColumn Header="Area" Binding="{Binding Area}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        <DataGridTextColumn Header="Check" Binding="{Binding Requirement}" Width="7*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        <DataGridTextColumn Header="Why it matters" Binding="{Binding HelpText}" Width="8*" ElementStyle="{StaticResource GridTextStyle}"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </DockPanel>
@@ -155,28 +171,29 @@
                             <RowDefinition Height="2*"/>
                             <RowDefinition Height="1.2*"/>
                         </Grid.RowDefinitions>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <WrapPanel Margin="0,0,0,4">
                             <Button Content="Import CSV" Click="ImportUsers_Click"/>
+                            <Button Content="Save CSV Template" Click="SaveCsvTemplate_Click" Background="#475467"/>
                             <Button Content="Load Example" Click="LoadSampleUsers_Click" Background="#475467"/>
                             <Button Content="Validate Rows" Click="ValidateBulkUsers_Click"/>
                             <Button Content="Generate PowerShell Plan" Click="GenerateBulkScript_Click"/>
                             <Button Content="Export Review Report" Click="ExportValidationReport_Click" Background="#475467"/>
-                        </StackPanel>
+                        </WrapPanel>
                         <Border Grid.Row="1" Background="#EFF8FF" BorderBrush="#B2DDFF" BorderThickness="1" Padding="12,8" Margin="0,0,0,12">
                             <TextBlock Text="{Binding ImportSummary}" Foreground="#175CD3" TextWrapping="Wrap"/>
                         </Border>
                         <DataGrid Grid.Row="2" ItemsSource="{Binding BulkUsers}">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="CSV Row" Binding="{Binding SourceLine}" Width="80" IsReadOnly="True"/>
-                                <DataGridTextColumn Header="Status" Binding="{Binding ValidationStatus}" Width="100"/>
-                                <DataGridTextColumn Header="Username" Binding="{Binding SamAccountName}" Width="120"/>
-                                <DataGridTextColumn Header="First" Binding="{Binding FirstName}" Width="120"/>
-                                <DataGridTextColumn Header="Last" Binding="{Binding LastName}" Width="120"/>
-                                <DataGridTextColumn Header="OU" Binding="{Binding OrganizationalUnit}" Width="250"/>
-                                <DataGridTextColumn Header="Groups" Binding="{Binding Groups}" Width="220"/>
-                                <DataGridTextColumn Header="Profile Path" Binding="{Binding ProfilePath}" Width="240"/>
-                                <DataGridTextColumn Header="Allowed PCs" Binding="{Binding AllowedWorkstations}" Width="180"/>
-                                <DataGridTextColumn Header="Notes" Binding="{Binding ValidationMessage}" Width="*"/>
+                                <DataGridTextColumn Header="Row" Binding="{Binding SourceLine}" Width="55" IsReadOnly="True" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Status" Binding="{Binding ValidationStatus}" Width="70" IsReadOnly="True" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Username" Binding="{Binding SamAccountName}" Width="5*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="First" Binding="{Binding FirstName}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Last" Binding="{Binding LastName}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="OU" Binding="{Binding OrganizationalUnit}" Width="9*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Groups" Binding="{Binding Groups}" Width="7*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Profile Path" Binding="{Binding ProfilePath}" Width="8*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Allowed PCs" Binding="{Binding AllowedWorkstations}" Width="6*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Notes" Binding="{Binding ValidationMessage}" Width="9*" IsReadOnly="True" ElementStyle="{StaticResource GridTextStyle}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="14" Margin="0,14,0,0">
@@ -206,13 +223,13 @@
                             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="20" Margin="0,0,18,0">
                                 <DockPanel>
                                     <TextBlock DockPanel.Dock="Top" Text="Last Sign-in Sessions" FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
-                                    <DataGrid ItemsSource="{Binding DeviceSessions}">
+                                    <DataGrid ItemsSource="{Binding DeviceSessions}" IsReadOnly="True">
                                         <DataGrid.Columns>
-                                            <DataGridTextColumn Header="User" Binding="{Binding UserName}" Width="120"/>
-                                            <DataGridTextColumn Header="Computer" Binding="{Binding ComputerName}" Width="150"/>
-                                            <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" Width="140"/>
-                                            <DataGridTextColumn Header="Last Seen" Binding="{Binding LastSeen}" Width="170"/>
-                                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="*"/>
+                                            <DataGridTextColumn Header="User" Binding="{Binding UserName}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Computer" Binding="{Binding ComputerName}" Width="5*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Last Seen" Binding="{Binding LastSeen}" Width="6*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="6*" ElementStyle="{StaticResource GridTextStyle}"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
                                 </DockPanel>
@@ -239,12 +256,12 @@
                         <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="20" Margin="0,0,18,0">
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Top" Text="Approved Action Catalog" FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
-                                <DataGrid ItemsSource="{Binding ActionTemplates}" SelectionChanged="ActionTemplates_SelectionChanged" x:Name="ActionTemplateGrid">
+                                <DataGrid ItemsSource="{Binding ActionTemplates}" SelectionChanged="ActionTemplates_SelectionChanged" x:Name="ActionTemplateGrid" IsReadOnly="True">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Action" Binding="{Binding Name}" Width="190"/>
-                                        <DataGridTextColumn Header="Risk" Binding="{Binding RiskLevel}" Width="90"/>
-                                        <DataGridTextColumn Header="Requires" Binding="{Binding RequiredRole}" Width="160"/>
-                                        <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
+                                        <DataGridTextColumn Header="Action" Binding="{Binding Name}" Width="5*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        <DataGridTextColumn Header="Risk" Binding="{Binding RiskLevel}" Width="2*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        <DataGridTextColumn Header="Requires" Binding="{Binding RequiredRole}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="7*" ElementStyle="{StaticResource GridTextStyle}"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </DockPanel>
@@ -264,24 +281,24 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <WrapPanel Margin="0,0,0,4">
                             <Button Content="Simulate Windows Log Scan" Click="ScanWindowsLogs_Click"/>
                             <Button Content="Export Audit Log" Click="ExportAuditLog_Click" Background="#475467"/>
-                        </StackPanel>
-                        <DataGrid Grid.Row="1" ItemsSource="{Binding AuditEvents}">
+                        </WrapPanel>
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding AuditEvents}" IsReadOnly="True">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Time" Binding="{Binding Timestamp}" Width="170"/>
-                                <DataGridTextColumn Header="Actor" Binding="{Binding Actor}" Width="140"/>
-                                <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="220"/>
-                                <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="100"/>
-                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                                <DataGridTextColumn Header="Time" Binding="{Binding Timestamp}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Actor" Binding="{Binding Actor}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="2*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="9*" ElementStyle="{StaticResource GridTextStyle}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>
                 </TabItem>
             </TabControl>
 
-            <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" Margin="0,16,0,0"/>
+            <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,16,0,0"/>
         </Grid>
     </Grid>
 </Window>

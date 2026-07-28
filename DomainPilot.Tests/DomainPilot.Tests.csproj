@@ -10,6 +10,9 @@
     <Content Include="..\DomainPilot.Desktop\MainWindow.xaml"
              Link="ui\MainWindow.xaml"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\samples\bulk-users.template.csv"
+             Link="samples\bulk-users.template.csv"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

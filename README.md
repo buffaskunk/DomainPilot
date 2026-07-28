@@ -18,6 +18,7 @@ Rick Linville provides this software as-is and is not responsible or liable for 
 
 - Bulk user provisioning review with validation before script generation.
 - UTF-8 CSV import with quoted-field support, required-schema checks, source-line tracking, and a 5,000-row batch limit.
+- Downloadable CSV template with fictional values for guided technician testing.
 - Technician review-report export for correcting and approving bulk changes.
 - Profile path, group membership, OU, and workstation restriction planning.
 - Dry-run PowerShell generation with `-WhatIf` guardrails.

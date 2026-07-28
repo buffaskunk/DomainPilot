@@ -1,0 +1,2 @@
+SamAccountName,FirstName,LastName,OrganizationalUnit,Groups,ProfilePath,AllowedWorkstations
+sample.user,Sample,User,"OU=Staff,OU=Users,DC=corp,DC=example,DC=com","GG-Standard-Users","\\files01\profiles\sample.user","PC-DEMO-001"

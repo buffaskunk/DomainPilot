@@ -20,12 +20,18 @@ The public sample uses fictional names, domains, servers, IP addresses, and comp
 
 ## Review Workflow
 
-1. Select **Import CSV** and choose a UTF-8 CSV file.
-2. Read the import summary and correct structural errors.
-3. Review every row marked **Review**.
-4. Select **Validate Rows** after making grid edits.
-5. Export the review report for change approval when required.
-6. Generate the PowerShell plan and confirm every command still includes `-WhatIf`.
+The Markdown document explains the workflow; it is not an import file. DomainPilot accepts files ending in `.csv`.
+
+1. Select **Save CSV Template** and choose where to save an editable template.
+2. Replace the fictional example values in Excel or a text editor and save the CSV.
+3. Select **Import CSV** and choose that edited file.
+4. Read the import summary and correct structural errors.
+5. Review every row marked **Review**.
+6. Select **Validate Rows** after making grid edits.
+7. Export the review report for change approval when required.
+8. Generate the PowerShell plan and confirm every command still includes `-WhatIf`.
+
+**Load Example** imports a separate training file containing two valid rows and one intentionally unsafe row. It exercises the same parser without requiring you to create a file.
 
 DomainPilot limits one file to 5 MB and one batch to 5,000 structurally valid users so large changes can be divided into manageable, auditable approvals. Exported review reports neutralize formula-like cell values before they are opened in spreadsheet software.
 

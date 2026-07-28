@@ -91,6 +91,16 @@ Assert("CSV import skips rows with the wrong column count", () =>
         && result.Issues.Any(issue => issue.Message.Contains("row was skipped", StringComparison.OrdinalIgnoreCase));
 });
 
+Assert("packaged CSV template is immediately importable", () =>
+{
+    var templatePath = Path.Combine(AppContext.BaseDirectory, "samples", "bulk-users.template.csv");
+    using var stream = File.OpenRead(templatePath);
+    var result = csvImporter.Import(stream);
+    return result.Rows.Count == 1
+        && !result.HasErrors
+        && validator.Validate(result.Rows[0].Request).IsReady;
+});
+
 Assert("validation report neutralizes CSV formula-like values", () =>
 {
     var request = ValidRequest() with { FirstName = "=Example" };
@@ -122,6 +132,21 @@ Assert("read-only text boxes do not write to view-model properties", () =>
         .Select(element => (string?)element.Attribute("Text"))
         .Where(text => text?.Contains("{Binding", StringComparison.Ordinal) == true)
         .All(text => text!.Contains("Mode=OneWay", StringComparison.Ordinal));
+});
+
+Assert("display-only grids are explicitly read-only", () =>
+{
+    var xamlPath = Path.Combine(AppContext.BaseDirectory, "ui", "MainWindow.xaml");
+    var document = XDocument.Load(xamlPath);
+    XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+    var editableGrid = document
+        .Descendants(presentation + "DataGrid")
+        .Single(element => string.Equals((string?)element.Attribute("ItemsSource"), "{Binding BulkUsers}", StringComparison.Ordinal));
+
+    return document
+        .Descendants(presentation + "DataGrid")
+        .Where(element => element != editableGrid)
+        .All(element => string.Equals((string?)element.Attribute("IsReadOnly"), "True", StringComparison.OrdinalIgnoreCase));
 });
 
 if (failures.Count > 0)

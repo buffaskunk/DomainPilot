@@ -17,6 +17,9 @@
     <Content Include="..\samples\bulk-users.sample.csv"
              Link="samples\bulk-users.sample.csv"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\samples\bulk-users.template.csv"
+             Link="samples\bulk-users.template.csv"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

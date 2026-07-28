@@ -157,6 +157,42 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ImportCsvFile(dialog.FileName, Path.GetFileName(dialog.FileName), writeAudit: true);
     }
 
+    private void SaveCsvTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Save DomainPilot bulk-user CSV template",
+            FileName = "domainpilot-bulk-users.csv",
+            Filter = "CSV files (*.csv)|*.csv",
+            AddExtension = true,
+            DefaultExt = ".csv"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            StatusMessage = "CSV template save cancelled.";
+            return;
+        }
+
+        try
+        {
+            var templatePath = Path.Combine(AppContext.BaseDirectory, "samples", "bulk-users.template.csv");
+            File.Copy(templatePath, dialog.FileName, overwrite: true);
+            AddAudit("Saved CSV template", "Info", "Copied the fictional bulk-user template to a technician-selected file.");
+            StatusMessage = "CSV template saved. Replace the fictional example values, save the file, and then select Import CSV.";
+        }
+        catch (IOException exception)
+        {
+            AddAudit("CSV template save failed", "Error", exception.GetType().Name);
+            StatusMessage = "The CSV template could not be saved. Check the destination and try again.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            AddAudit("CSV template save failed", "Error", "Access denied.");
+            StatusMessage = "Access to the selected template destination was denied.";
+        }
+    }
+
     private void ValidateBulkUsers_Click(object sender, RoutedEventArgs e)
     {
         ValidateBulkUsers();
