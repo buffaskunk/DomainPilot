@@ -1,5 +1,7 @@
 # DomainPilot RSAT Console
 
+[![DomainPilot CI](https://github.com/buffaskunk/DomainPilot/actions/workflows/ci.yml/badge.svg)](https://github.com/buffaskunk/DomainPilot/actions/workflows/ci.yml)
+
 DomainPilot is a Windows desktop prototype for safer Active Directory help desk operations. It is built as a Visual Studio 2022 WPF app and is intended to demonstrate secure bulk administration workflows, technician training, auditability, and environment readiness checks.
 
 Author and copyright holder: **Rick Linville** (`buffaskunk`)
@@ -26,6 +28,8 @@ Rick Linville provides this software as-is and is not responsible or liable for 
 - Approved script/action catalog with risk level and required role.
 - Local-only Windows, domain-join, DNS configuration, and RSAT readiness checks.
 - Non-executable domain-discovery preview that documents expected DNS and directory traffic.
+- Read-only Directory Explorer for fictional users, computers, groups, and OUs with bounded search, cancellation, timeouts, source attribution, and detailed attributes.
+- Credential-free environment profile persistence under local application data.
 - Audit log viewer and CSV export.
 - Layered C# architecture with validation tests.
 
@@ -62,9 +66,9 @@ DomainPilot is split into focused projects:
 - `DomainPilot.App`: validation, use-case services, and gateway interfaces.
 - `DomainPilot.Infrastructure`: demo gateway and audit logging implementations.
 - `DomainPilot.Desktop`: WPF technician interface.
-- `DomainPilot.Tests`: lightweight validation and safety checks.
+- `DomainPilot.Tests`: lightweight validation, provider, UI-contract, persistence, and safety checks.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BULK_USER_IMPORT.md](docs/BULK_USER_IMPORT.md), [docs/ENVIRONMENT_DISCOVERY.md](docs/ENVIRONMENT_DISCOVERY.md), and [docs/AI_COLLABORATION.md](docs/AI_COLLABORATION.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BULK_USER_IMPORT.md](docs/BULK_USER_IMPORT.md), [docs/DIRECTORY_EXPLORER.md](docs/DIRECTORY_EXPLORER.md), [docs/ENVIRONMENT_DISCOVERY.md](docs/ENVIRONMENT_DISCOVERY.md), and [docs/AI_COLLABORATION.md](docs/AI_COLLABORATION.md).
 
 ## Roadmap
 

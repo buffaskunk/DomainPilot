@@ -1,0 +1,35 @@
+name: DomainPilot CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore DomainPilot.sln
+
+      - name: Build
+        run: dotnet build DomainPilot.sln --configuration Release --no-restore
+
+      - name: Run safety tests
+        run: dotnet run --configuration Release --no-build --project .\DomainPilot.Tests\DomainPilot.Tests.csproj

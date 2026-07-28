@@ -19,8 +19,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly UserProvisioningValidationReportBuilder _reportBuilder = new();
     private readonly EnvironmentReadinessService _environmentReadiness = new();
     private readonly ILocalEnvironmentInspector _localEnvironment = new WindowsLocalEnvironmentInspector();
+    private readonly IEnvironmentProfileStore _environmentProfileStore = new JsonEnvironmentProfileStore();
+    private readonly EnvironmentProfileValidator _environmentProfileValidator = new();
+    private readonly DirectoryExplorerService _directoryExplorer = new(new DemoReadOnlyDirectoryGateway());
     private readonly IActiveDirectoryGateway _activeDirectory = new DemoActiveDirectoryGateway();
     private readonly IAuditLogService _auditLog;
+    private CancellationTokenSource? _directorySearchCancellation;
+    private CancellationTokenSource? _directoryDetailsCancellation;
     private EnvironmentProfile _environmentProfile = new(
         "Local workstation",
         AdministrationMode.Demo,
@@ -35,6 +40,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _environmentTarget = "Not detected - local checks have not run.";
     private string _environmentNetworkState = "No network discovery has run.";
     private string _discoveryPreviewSummary = "Run local checks first, then preview the exact DNS and directory reads proposed for a future milestone.";
+    private DirectoryObjectType _selectedDirectoryObjectType = DirectoryObjectType.All;
+    private string _directorySearchSummary = "Search the fictional directory by name, account, description, or distinguished name.";
+    private string _directorySourceSummary = "Provider: Demo read-only directory. No domain or network source is connected.";
+    private string _directorySelectedObject = "Select a result to inspect its directory attributes.";
 
     public MainWindow()
     {
@@ -60,6 +69,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public ObservableCollection<DomainDiscoveryPlanStep> DiscoveryPlanSteps { get; } = [];
 
+    public ObservableCollection<DirectoryObjectSummary> DirectorySearchResults { get; } = [];
+
+    public ObservableCollection<DirectoryAttributeValue> DirectoryObjectAttributes { get; } = [];
+
+    public IReadOnlyList<DirectoryObjectType> DirectoryObjectTypes { get; } =
+        Enum.GetValues<DirectoryObjectType>();
+
     public string OperatorName => Environment.UserName;
 
     public string SafetyMode => $"{_activeDirectory.Mode} mode";
@@ -70,7 +86,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         set => SetField(ref _environmentStatus, value);
     }
 
-    public string EnvironmentProfileName => _environmentProfile.Name;
+    public string EnvironmentProfileName
+    {
+        get => _environmentProfile.Name;
+        set
+        {
+            var safeValue = value ?? string.Empty;
+            if (_environmentProfile.Name == safeValue)
+            {
+                return;
+            }
+
+            _environmentProfile = _environmentProfile with { Name = safeValue };
+            OnPropertyChanged();
+        }
+    }
 
     public string EnvironmentProfileMode => _environmentProfile.Mode.ToString();
 
@@ -94,6 +124,30 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         get => _discoveryPreviewSummary;
         set => SetField(ref _discoveryPreviewSummary, value);
+    }
+
+    public DirectoryObjectType SelectedDirectoryObjectType
+    {
+        get => _selectedDirectoryObjectType;
+        set => SetField(ref _selectedDirectoryObjectType, value);
+    }
+
+    public string DirectorySearchSummary
+    {
+        get => _directorySearchSummary;
+        set => SetField(ref _directorySearchSummary, value);
+    }
+
+    public string DirectorySourceSummary
+    {
+        get => _directorySourceSummary;
+        set => SetField(ref _directorySourceSummary, value);
+    }
+
+    public string DirectorySelectedObject
+    {
+        get => _directorySelectedObject;
+        set => SetField(ref _directorySelectedObject, value);
     }
 
     public int QueuedUserCount => BulkUsers.Count;
@@ -139,6 +193,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         LoadBundledSample(writeAudit: false);
         RefreshEnvironmentChecks(_environmentReadiness.CreatePendingResults());
+        LoadEnvironmentProfile();
 
         SetupChecks.Clear();
         SetupChecks.Add(new SetupCheck("Workstation", "RSAT Active Directory module installed", "Verify", "Run the measured local check from the Environment tab."));
@@ -242,6 +297,148 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         EnvironmentNetworkState = "Preview created. No network request was sent and the active mode remains Demo.";
         AddAudit("Previewed domain discovery", "Info", "Displayed a non-executable plan containing no write operation.");
         StatusMessage = "Read-only discovery preview created. Nothing was executed.";
+    }
+
+    private void SaveEnvironmentProfile_Click(object sender, RoutedEventArgs e)
+    {
+        var normalizedProfile = _environmentProfile with
+        {
+            Name = _environmentProfile.Name.Trim(),
+            DomainName = _environmentProfile.DomainName.Trim(),
+            PreferredDomainController = _environmentProfile.PreferredDomainController.Trim()
+        };
+        var issues = _environmentProfileValidator.Validate(normalizedProfile);
+        if (issues.Count > 0)
+        {
+            StatusMessage = string.Join(" ", issues);
+            return;
+        }
+
+        try
+        {
+            _environmentProfileStore.Save(normalizedProfile);
+            ApplyEnvironmentProfile(normalizedProfile);
+            AddAudit("Saved environment profile", "Info", "Saved routing metadata locally without credentials.");
+            StatusMessage = "Environment profile saved under your local application data. No credentials or network data were stored.";
+        }
+        catch (Exception exception)
+        {
+            AddAudit("Environment profile save failed", "Error", exception.GetType().Name);
+            StatusMessage = "The local environment profile could not be saved. Check access to your local application data folder.";
+        }
+    }
+
+    private async void SearchDirectory_Click(object sender, RoutedEventArgs e)
+    {
+        _directorySearchCancellation?.Cancel();
+        _directorySearchCancellation?.Dispose();
+        _directorySearchCancellation = new CancellationTokenSource();
+
+        DirectorySearchResults.Clear();
+        DirectoryObjectAttributes.Clear();
+        DirectorySelectedObject = "Select a result to inspect its directory attributes.";
+        DirectorySearchSummary = "Searching the demo directory...";
+
+        try
+        {
+            var request = new DirectorySearchRequest(
+                DirectorySearchTextBox.Text,
+                SelectedDirectoryObjectType,
+                MaximumResults: 100);
+            var response = await _directoryExplorer.SearchAsync(
+                request,
+                _directorySearchCancellation.Token);
+
+            foreach (var item in response.Items)
+            {
+                DirectorySearchResults.Add(item);
+            }
+
+            DirectorySearchSummary = response.Items.Count == 0
+                ? "No matching fictional directory objects were found."
+                : $"{response.Items.Count} result(s) returned in {response.Duration.TotalMilliseconds:0.0} ms"
+                    + (response.WasTruncated ? "; result limit reached." : ".");
+            DirectorySourceSummary = FormatDirectorySource(response.Source);
+            AddAudit(
+                "Searched read-only directory",
+                "Info",
+                $"Demo provider returned {response.Items.Count} {SelectedDirectoryObjectType} result(s).");
+            StatusMessage = "Directory search completed against fictional demo data. No domain was queried.";
+        }
+        catch (ArgumentException exception)
+        {
+            DirectorySearchSummary = exception.Message;
+            StatusMessage = "Directory search was not sent because the request needs correction.";
+        }
+        catch (TimeoutException exception)
+        {
+            DirectorySearchSummary = exception.Message;
+            AddAudit("Directory search timed out", "Warning", "The read-only provider exceeded its operation limit.");
+            StatusMessage = "Directory search timed out safely.";
+        }
+        catch (OperationCanceledException)
+        {
+            DirectorySearchSummary = "Directory search cancelled.";
+            StatusMessage = "Directory search cancelled.";
+        }
+        catch (Exception exception)
+        {
+            DirectorySearchSummary = $"Directory search failed safely: {exception.GetType().Name}.";
+            AddAudit("Directory search failed", "Error", exception.GetType().Name);
+            StatusMessage = "Directory search failed without changing any environment.";
+        }
+    }
+
+    private void CancelDirectorySearch_Click(object sender, RoutedEventArgs e)
+    {
+        _directorySearchCancellation?.Cancel();
+        _directoryDetailsCancellation?.Cancel();
+        StatusMessage = "Directory operation cancellation requested.";
+    }
+
+    private async void DirectoryResults_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (DirectoryResultsGrid.SelectedItem is not DirectoryObjectSummary selected)
+        {
+            return;
+        }
+
+        _directoryDetailsCancellation?.Cancel();
+        _directoryDetailsCancellation?.Dispose();
+        _directoryDetailsCancellation = new CancellationTokenSource();
+        DirectoryObjectAttributes.Clear();
+        DirectorySelectedObject = $"Loading {selected.ObjectType}: {selected.Name}...";
+
+        try
+        {
+            var response = await _directoryExplorer.GetDetailsAsync(
+                selected.ObjectId,
+                _directoryDetailsCancellation.Token);
+            foreach (var attribute in response.Attributes)
+            {
+                DirectoryObjectAttributes.Add(attribute);
+            }
+
+            DirectorySelectedObject = $"{response.Object.ObjectType}: {response.Object.Name} ({response.Object.AccountName})";
+            DirectorySourceSummary = FormatDirectorySource(response.Source);
+            StatusMessage = "Directory details loaded from fictional demo data.";
+        }
+        catch (OperationCanceledException)
+        {
+            DirectorySelectedObject = "Directory detail request cancelled.";
+        }
+        catch (TimeoutException)
+        {
+            DirectorySelectedObject = "Directory detail request timed out safely.";
+            AddAudit("Directory details timed out", "Warning", "The read-only provider exceeded its operation limit.");
+            StatusMessage = "Directory details timed out safely.";
+        }
+        catch (Exception exception)
+        {
+            DirectorySelectedObject = $"Details failed safely: {exception.GetType().Name}.";
+            AddAudit("Directory details failed", "Error", exception.GetType().Name);
+            StatusMessage = "Directory details could not be loaded.";
+        }
     }
 
     private void LoadSampleUsers_Click(object sender, RoutedEventArgs e)
@@ -538,6 +735,53 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             EnvironmentChecks.Add(result);
         }
+    }
+
+    private void LoadEnvironmentProfile()
+    {
+        try
+        {
+            var savedProfile = _environmentProfileStore.Load();
+            if (savedProfile is null)
+            {
+                return;
+            }
+
+            ApplyEnvironmentProfile(savedProfile);
+            EnvironmentNetworkState = "Credential-free local profile loaded. No network discovery has run.";
+            AddAudit("Loaded environment profile", "Info", "Loaded local routing metadata without credentials.");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            EnvironmentNetworkState = "Saved profile could not be loaded. DomainPilot remains in Demo mode with no network activity.";
+            AddAudit("Environment profile load failed", "Warning", exception.GetType().Name);
+        }
+    }
+
+    private void ApplyEnvironmentProfile(EnvironmentProfile profile)
+    {
+        _environmentProfile = profile;
+        EnvironmentTarget = string.IsNullOrWhiteSpace(profile.DomainName)
+            ? "Not detected - run local checks."
+            : profile.DomainName;
+        OnPropertyChanged(nameof(EnvironmentProfileName));
+        OnPropertyChanged(nameof(EnvironmentProfileMode));
+        OnPropertyChanged(nameof(EnvironmentRouting));
+    }
+
+    private static string FormatDirectorySource(DirectoryDataSource source)
+    {
+        var dataKind = source.IsSynthetic ? "fictional data" : "read-only environment data";
+        return $"{source.Provider} | {source.Environment} | {source.Server} | {source.Mode} | {dataKind} | {source.RetrievedAt:yyyy-MM-dd HH:mm:ss zzz}";
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _directorySearchCancellation?.Cancel();
+        _directorySearchCancellation?.Dispose();
+        _directoryDetailsCancellation?.Cancel();
+        _directoryDetailsCancellation?.Dispose();
+        base.OnClosed(e);
     }
 
     private void RefreshCounts()

@@ -22,7 +22,7 @@ DomainPilot.App
 Use-case services, environment-readiness policy, CSV import, validation and review reporting, PowerShell plan generation, and interfaces.
 
 DomainPilot.Infrastructure
-Gateway implementations for local Windows inspection, demo data, audit logging, files, PowerShell, AD, and logs.
+Gateway implementations for local Windows inspection, credential-free profile storage, demo directory data, audit logging, files, PowerShell, AD, and logs.
 
 DomainPilot.Desktop
 WPF user interface and technician workflows.
@@ -37,6 +37,7 @@ Lightweight safety and validation checks that run without external test packages
 Desktop -> App -> Core
 Desktop -> Infrastructure -> App/Core
 Tests -> App/Core
+Tests -> Infrastructure
 ```
 
 Core never depends on Desktop or Infrastructure. This keeps the business rules testable and prevents UI button handlers from becoming the source of security policy.
@@ -45,7 +46,7 @@ Core never depends on Desktop or Infrastructure. This keeps the business rules t
 
 1. Keep demo mode as the default.
 2. Add real CSV import and row-level validation export. (Implemented)
-3. Add configuration profiles for Demo, DryRun, and future Live. (Local in-memory profile implemented)
+3. Add configuration profiles for Demo, DryRun, and future Live. (Credential-free local profile implemented)
 4. Add read-only environment readiness checks. (Local-only checks and network preview implemented)
-5. Add a dry-run Active Directory gateway.
+5. Add a dry-run Active Directory gateway. (Read-only contracts and full demo provider implemented)
 6. Add live actions only after approval, audit, and rollback workflows are implemented.

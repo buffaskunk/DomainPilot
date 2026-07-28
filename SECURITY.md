@@ -10,6 +10,8 @@ This repository currently contains a dry-run prototype. It does not directly mod
 
 The Environment tab can perform explicitly requested local workstation checks. These checks use local Windows APIs and file-system reads and do not contact DNS, a domain controller, an event-log source, or another computer. The domain-discovery screen is currently a non-executable preview.
 
+The Directory Explorer currently uses fictional demo data. Its shared gateway contract exposes read operations only, enforces bounded searches and timeouts, and records source information. The prepared Windows DC Locator provider is not connected to the desktop UI and requires an explicit approval flag before it can run.
+
 ## Production Requirements
 
 - Use delegated AD groups for each action category.

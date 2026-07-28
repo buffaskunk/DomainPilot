@@ -175,10 +175,14 @@
                             <UniformGrid Rows="1" Columns="4">
                                 <StackPanel Margin="0,0,16,0">
                                     <TextBlock Text="Profile" Foreground="{StaticResource MutedBrush}"/>
-                                    <TextBlock Text="{Binding EnvironmentProfileName}" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                    <TextBox Text="{Binding EnvironmentProfileName, UpdateSourceTrigger=PropertyChanged}"
+                                             MaxLength="64"
+                                             Padding="6,3"
+                                             Margin="0,4,0,0"
+                                             VerticalContentAlignment="Center"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,0,16,0">
-                                    <TextBlock Text="Active Mode" Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock Text="Profile Mode" Foreground="{StaticResource MutedBrush}"/>
                                     <TextBlock Text="{Binding EnvironmentProfileMode}" FontWeight="SemiBold" Margin="0,4,0,0"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,0,16,0">
@@ -200,6 +204,7 @@
                             <WrapPanel>
                                 <Button Content="Run Local Checks" Click="RunLocalChecks_Click"/>
                                 <Button Content="Preview Domain Discovery" Click="PreviewDomainDiscovery_Click" Background="#475467"/>
+                                <Button Content="Save Local Profile" Click="SaveEnvironmentProfile_Click" Background="#475467"/>
                             </WrapPanel>
                             <Border Grid.Column="1" Background="#EFF8FF" BorderBrush="#B2DDFF" BorderThickness="1" Padding="12,8" Margin="10,0,0,8">
                                 <TextBlock Text="{Binding EnvironmentNetworkState}" Foreground="#175CD3" TextWrapping="Wrap"/>
@@ -239,6 +244,82 @@
                                             <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
                                             <DataGridTextColumn Header="Proposed Operation" Binding="{Binding Operation}" Width="7*" ElementStyle="{StaticResource GridTextStyle}"/>
                                             <DataGridTextColumn Header="Expected Activity" Binding="{Binding ExpectedActivity}" Width="6*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Directory Explorer">
+                    <Grid Margin="0,18,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <WrapPanel Margin="0,0,0,4">
+                            <ComboBox Width="165"
+                                      Height="38"
+                                      Margin="0,0,8,8"
+                                      Padding="8,5"
+                                      ItemsSource="{Binding DirectoryObjectTypes}"
+                                      SelectedItem="{Binding SelectedDirectoryObjectType}"/>
+                            <TextBox x:Name="DirectorySearchTextBox"
+                                     Width="330"
+                                     Height="38"
+                                     Margin="0,0,8,8"
+                                     Padding="10,7"
+                                     Text="martinez"
+                                     VerticalContentAlignment="Center"/>
+                            <Button Content="Search Directory" Click="SearchDirectory_Click"/>
+                            <Button Content="Cancel" Click="CancelDirectorySearch_Click" Background="#475467"/>
+                        </WrapPanel>
+
+                        <Border Grid.Row="1" Background="#EFF8FF" BorderBrush="#B2DDFF" BorderThickness="1" Padding="12,8" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="{Binding DirectorySearchSummary}" Foreground="#175CD3" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding DirectorySourceSummary}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.15*"/>
+                                <ColumnDefinition Width="1*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="16" Margin="0,0,16,0">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top" Text="Directory Results" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
+                                    <DataGrid x:Name="DirectoryResultsGrid"
+                                              ItemsSource="{Binding DirectorySearchResults}"
+                                              SelectionChanged="DirectoryResults_SelectionChanged"
+                                              IsReadOnly="True">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Type" Binding="{Binding ObjectType}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="5*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Account" Binding="{Binding AccountName}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="6*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="16">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                                        <TextBlock Text="Object Details" FontSize="18" FontWeight="Bold"/>
+                                        <TextBlock Text="{Binding DirectorySelectedObject}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                    </StackPanel>
+                                    <DataGrid ItemsSource="{Binding DirectoryObjectAttributes}" IsReadOnly="True">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Attribute" Binding="{Binding Name}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="8*" ElementStyle="{StaticResource GridTextStyle}"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
                                 </DockPanel>

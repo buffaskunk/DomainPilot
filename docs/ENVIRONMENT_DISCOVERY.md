@@ -39,3 +39,9 @@ Normal DNS, Kerberos, and LDAP activity may still appear in server logs or secur
 ## Multi-Site Direction
 
 For organizations with multiple buildings, domain controllers, and WAN links, DomainPilot will prefer Windows site-aware discovery. A later profile milestone will support approved controller preferences and controlled failover without querying every controller by default.
+
+The native `WindowsDomainControllerDiscovery` implementation is now present but disconnected from the desktop UI. It uses a cache-friendly `DsGetDcName` call, does not force rediscovery, and rejects requests that do not contain an explicit operator-approval flag. No current button can invoke it.
+
+## Local Profile
+
+The profile name, mode, detected domain, preferred controller, and site-routing preference can be saved under the current user's local application data. The JSON schema has no password, credential, token, or secret field. Writes use a temporary file followed by an atomic replacement so an interrupted save is less likely to corrupt the active profile.

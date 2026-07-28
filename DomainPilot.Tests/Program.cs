@@ -8,6 +8,8 @@ var csvImporter = new UserProvisioningCsvImporter();
 var planBuilder = new PowerShellPlanBuilder();
 var reportBuilder = new UserProvisioningValidationReportBuilder();
 var environmentReadiness = new EnvironmentReadinessService();
+var demoDirectory = new DemoReadOnlyDirectoryGateway();
+var directoryExplorer = new DirectoryExplorerService(demoDirectory);
 var failures = new List<string>();
 
 Assert("valid row is ready", () =>
@@ -190,6 +192,133 @@ Assert("Windows local inspector declares that it performed no network activity",
         && !string.IsNullOrWhiteSpace(snapshot.CurrentIdentity);
 });
 
+Assert("demo directory searches users and reports a synthetic source", () =>
+{
+    var response = directoryExplorer
+        .SearchAsync(
+            new DirectorySearchRequest("martinez", DirectoryObjectType.User, 100),
+            CancellationToken.None)
+        .GetAwaiter()
+        .GetResult();
+    return response.Items.Count == 1
+        && response.Items[0].AccountName == "jmartinez"
+        && response.Source.IsSynthetic
+        && response.Source.Mode == AdministrationMode.Demo;
+});
+
+Assert("demo directory returns categorized object details", () =>
+{
+    var details = directoryExplorer
+        .GetDetailsAsync("demo-computer-helpdesk14", CancellationToken.None)
+        .GetAwaiter()
+        .GetResult();
+    return details.Object.ObjectType == DirectoryObjectType.Computer
+        && details.Attributes.Any(attribute =>
+            attribute.Category == "Operating system"
+            && attribute.Name == "Name")
+        && details.Attributes.Any(attribute =>
+            attribute.Name == "Last known IPv4");
+});
+
+Assert("directory explorer blocks one-character broad searches", () =>
+{
+    try
+    {
+        directoryExplorer
+            .SearchAsync(
+                new DirectorySearchRequest("a", DirectoryObjectType.All, 100),
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        return false;
+    }
+    catch (ArgumentException exception)
+    {
+        return exception.Message.Contains("at least two characters", StringComparison.OrdinalIgnoreCase);
+    }
+});
+
+Assert("directory explorer converts provider cancellation into a timeout", () =>
+{
+    var slowExplorer = new DirectoryExplorerService(
+        new SlowReadOnlyDirectoryGateway(),
+        TimeSpan.FromMilliseconds(20));
+    try
+    {
+        slowExplorer
+            .SearchAsync(
+                new DirectorySearchRequest("test", DirectoryObjectType.All, 100),
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        return false;
+    }
+    catch (TimeoutException)
+    {
+        return true;
+    }
+});
+
+Assert("LDAP filter values escape every RFC 4515 special character", () =>
+{
+    var escaped = LdapFilterValueEscaper.Escape("a*(b)\\c\0");
+    return escaped == "a\\2a\\28b\\29\\5cc\\00";
+});
+
+Assert("environment profile store round-trips routing data without credentials", () =>
+{
+    var testDirectory = Path.Combine(Path.GetTempPath(), $"DomainPilot.Tests-{Guid.NewGuid():N}");
+    var profilePath = Path.Combine(testDirectory, "profile.json");
+    Directory.CreateDirectory(testDirectory);
+
+    try
+    {
+        var store = new JsonEnvironmentProfileStore(profilePath);
+        var profile = new EnvironmentProfile(
+            "Test workstation",
+            AdministrationMode.Demo,
+            "corp.example.com",
+            "dc01.corp.example.com",
+            PreferLocalSite: true);
+        store.Save(profile);
+        var loaded = store.Load();
+        var json = File.ReadAllText(profilePath);
+
+        return loaded == profile
+            && !json.Contains("password", StringComparison.OrdinalIgnoreCase)
+            && !json.Contains("credential", StringComparison.OrdinalIgnoreCase)
+            && !json.Contains("token", StringComparison.OrdinalIgnoreCase);
+    }
+    finally
+    {
+        if (File.Exists(profilePath))
+        {
+            File.Delete(profilePath);
+        }
+
+        if (Directory.Exists(testDirectory))
+        {
+            Directory.Delete(testDirectory);
+        }
+    }
+});
+
+Assert("DC discovery policy requires explicit operator approval", () =>
+{
+    var policy = new DomainControllerDiscoveryPolicy();
+    var blocked = policy.Validate(new DomainControllerDiscoveryRequest(
+        "corp.example.com",
+        PreferLocalSite: true,
+        OperatorApproved: false));
+    var approved = policy.Validate(new DomainControllerDiscoveryRequest(
+        "corp.example.com",
+        PreferLocalSite: true,
+        OperatorApproved: true));
+
+    return blocked.Any(issue => issue.Contains("approve", StringComparison.OrdinalIgnoreCase))
+        && approved.Count == 0;
+});
+
 if (failures.Count > 0)
 {
     Console.ForegroundColor = ConsoleColor.Red;
@@ -254,4 +383,24 @@ static LocalEnvironmentSnapshot ExampleEnvironmentSnapshot()
         IsActiveDirectoryModuleInstalled: true,
         @"C:\Windows\System32\WindowsPowerShell\v1.0\Modules\ActiveDirectory\ActiveDirectory.psd1",
         NetworkActivityPerformed: false);
+}
+
+sealed class SlowReadOnlyDirectoryGateway : IReadOnlyDirectoryGateway
+{
+    public AdministrationMode Mode => AdministrationMode.Demo;
+
+    public async Task<DirectorySearchResponse> SearchAsync(
+        DirectorySearchRequest request,
+        CancellationToken cancellationToken)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        throw new InvalidOperationException("The timeout test should cancel before this line.");
+    }
+
+    public Task<DirectoryObjectDetailsResponse> GetDetailsAsync(
+        string objectId,
+        CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
 }
