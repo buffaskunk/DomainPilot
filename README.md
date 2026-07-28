@@ -24,7 +24,8 @@ Rick Linville provides this software as-is and is not responsible or liable for 
 - Dry-run PowerShell generation with `-WhatIf` guardrails.
 - User and device lookup concept for last known PC and IP address.
 - Approved script/action catalog with risk level and required role.
-- Technician-facing environment readiness checklist.
+- Local-only Windows, domain-join, DNS configuration, and RSAT readiness checks.
+- Non-executable domain-discovery preview that documents expected DNS and directory traffic.
 - Audit log viewer and CSV export.
 - Layered C# architecture with validation tests.
 
@@ -63,12 +64,12 @@ DomainPilot is split into focused projects:
 - `DomainPilot.Desktop`: WPF technician interface.
 - `DomainPilot.Tests`: lightweight validation and safety checks.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BULK_USER_IMPORT.md](docs/BULK_USER_IMPORT.md), and [docs/AI_COLLABORATION.md](docs/AI_COLLABORATION.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BULK_USER_IMPORT.md](docs/BULK_USER_IMPORT.md), [docs/ENVIRONMENT_DISCOVERY.md](docs/ENVIRONMENT_DISCOVERY.md), and [docs/AI_COLLABORATION.md](docs/AI_COLLABORATION.md).
 
 ## Roadmap
 
 - CSV template download and optional column mapping.
-- Active Directory service layer with mock, dry-run, and live providers.
+- Persisted environment profiles and an explicitly approved read-only AD discovery provider.
 - Role-based action visibility.
 - PowerShell execution through constrained runspaces.
 - Windows Event Forwarding or SIEM connector for sign-in lookup.

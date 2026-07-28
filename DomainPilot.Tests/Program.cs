@@ -7,6 +7,7 @@ var validator = new UserProvisioningValidator();
 var csvImporter = new UserProvisioningCsvImporter();
 var planBuilder = new PowerShellPlanBuilder();
 var reportBuilder = new UserProvisioningValidationReportBuilder();
+var environmentReadiness = new EnvironmentReadinessService();
 var failures = new List<string>();
 
 Assert("valid row is ready", () =>
@@ -149,6 +150,46 @@ Assert("display-only grids are explicitly read-only", () =>
         .All(element => string.Equals((string?)element.Attribute("IsReadOnly"), "True", StringComparison.OrdinalIgnoreCase));
 });
 
+Assert("local readiness reports domain and RSAT evidence without network activity", () =>
+{
+    var snapshot = ExampleEnvironmentSnapshot();
+    var results = environmentReadiness.Evaluate(snapshot);
+    return results.Any(result =>
+            result.Area == "Identity"
+            && result.Status == EnvironmentReadinessStatus.Pass)
+        && results.Any(result =>
+            result.Area == "Tools"
+            && result.Status == EnvironmentReadinessStatus.Pass)
+        && results.Any(result =>
+            result.Area == "Safety"
+            && result.Status == EnvironmentReadinessStatus.Pass);
+});
+
+Assert("domain discovery preview cannot modify an environment", () =>
+{
+    var profile = new EnvironmentProfile(
+        "Test profile",
+        AdministrationMode.Demo,
+        "corp.example.com",
+        string.Empty,
+        PreferLocalSite: true);
+    var preview = environmentReadiness.BuildDiscoveryPreview(profile, ExampleEnvironmentSnapshot());
+
+    return !preview.ContainsWrites
+        && preview.Steps.Count == 5
+        && preview.Steps.Any(step => step.Source == "DNS" && step.IsNetworkActivity)
+        && preview.Steps.Any(step => step.Source == "Selected domain controller" && step.IsNetworkActivity)
+        && preview.Steps.All(step => !step.CanModifyEnvironment);
+});
+
+Assert("Windows local inspector declares that it performed no network activity", () =>
+{
+    var snapshot = new WindowsLocalEnvironmentInspector().Inspect();
+    return !snapshot.NetworkActivityPerformed
+        && !string.IsNullOrWhiteSpace(snapshot.MachineName)
+        && !string.IsNullOrWhiteSpace(snapshot.CurrentIdentity);
+});
+
 if (failures.Count > 0)
 {
     Console.ForegroundColor = ConsoleColor.Red;
@@ -197,4 +238,20 @@ static UserProvisioningRequest ValidRequest()
 static MemoryStream CsvStream(string content)
 {
     return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+}
+
+static LocalEnvironmentSnapshot ExampleEnvironmentSnapshot()
+{
+    return new LocalEnvironmentSnapshot(
+        DateTimeOffset.Parse("2026-01-01T12:00:00Z"),
+        "Microsoft Windows",
+        IsWindows: true,
+        "TECH-PC-001",
+        "CORP\\technician",
+        IsDomainJoined: true,
+        "corp.example.com",
+        "corp.example.com",
+        IsActiveDirectoryModuleInstalled: true,
+        @"C:\Windows\System32\WindowsPowerShell\v1.0\Modules\ActiveDirectory\ActiveDirectory.psd1",
+        NetworkActivityPerformed: false);
 }

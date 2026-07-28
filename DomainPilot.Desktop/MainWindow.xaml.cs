@@ -17,11 +17,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly UserProvisioningCsvImporter _csvImporter = new();
     private readonly PowerShellPlanBuilder _planBuilder = new();
     private readonly UserProvisioningValidationReportBuilder _reportBuilder = new();
+    private readonly EnvironmentReadinessService _environmentReadiness = new();
+    private readonly ILocalEnvironmentInspector _localEnvironment = new WindowsLocalEnvironmentInspector();
     private readonly IActiveDirectoryGateway _activeDirectory = new DemoActiveDirectoryGateway();
     private readonly IAuditLogService _auditLog;
+    private EnvironmentProfile _environmentProfile = new(
+        "Local workstation",
+        AdministrationMode.Demo,
+        string.Empty,
+        string.Empty,
+        PreferLocalSite: true);
+    private LocalEnvironmentSnapshot? _lastLocalSnapshot;
     private string _statusMessage = "Ready. Demo mode uses safe sample data and does not query your domain.";
     private string _lookupSummary = "Search a user to see likely last sign-in device, IP, and support context.";
     private string _importSummary = "Load the bundled example or import a UTF-8 CSV file. No Active Directory actions run during import.";
+    private string _environmentStatus = "Demo data only";
+    private string _environmentTarget = "Not detected - local checks have not run.";
+    private string _environmentNetworkState = "No network discovery has run.";
+    private string _discoveryPreviewSummary = "Run local checks first, then preview the exact DNS and directory reads proposed for a future milestone.";
 
     public MainWindow()
     {
@@ -43,11 +56,45 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public ObservableCollection<AuditEntry> AuditEvents { get; } = [];
 
+    public ObservableCollection<EnvironmentReadinessResult> EnvironmentChecks { get; } = [];
+
+    public ObservableCollection<DomainDiscoveryPlanStep> DiscoveryPlanSteps { get; } = [];
+
     public string OperatorName => Environment.UserName;
 
     public string SafetyMode => $"{_activeDirectory.Mode} mode";
 
-    public string EnvironmentStatus => "Demo data only";
+    public string EnvironmentStatus
+    {
+        get => _environmentStatus;
+        set => SetField(ref _environmentStatus, value);
+    }
+
+    public string EnvironmentProfileName => _environmentProfile.Name;
+
+    public string EnvironmentProfileMode => _environmentProfile.Mode.ToString();
+
+    public string EnvironmentRouting => _environmentProfile.PreferLocalSite
+        ? "Prefer local AD site"
+        : "Manual controller";
+
+    public string EnvironmentTarget
+    {
+        get => _environmentTarget;
+        set => SetField(ref _environmentTarget, value);
+    }
+
+    public string EnvironmentNetworkState
+    {
+        get => _environmentNetworkState;
+        set => SetField(ref _environmentNetworkState, value);
+    }
+
+    public string DiscoveryPreviewSummary
+    {
+        get => _discoveryPreviewSummary;
+        set => SetField(ref _discoveryPreviewSummary, value);
+    }
 
     public int QueuedUserCount => BulkUsers.Count;
 
@@ -91,9 +138,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void SeedData()
     {
         LoadBundledSample(writeAudit: false);
+        RefreshEnvironmentChecks(_environmentReadiness.CreatePendingResults());
 
         SetupChecks.Clear();
-        SetupChecks.Add(new SetupCheck("Workstation", "RSAT Active Directory module installed", "Planned", "Needed for Get-ADUser, New-ADUser, and group membership checks."));
+        SetupChecks.Add(new SetupCheck("Workstation", "RSAT Active Directory module installed", "Verify", "Run the measured local check from the Environment tab."));
         SetupChecks.Add(new SetupCheck("Identity", "Technician account is delegated through role groups", "Required", "Avoids running as Domain Admin for routine account tasks."));
         SetupChecks.Add(new SetupCheck("Servers", "Profile path share exists and has least-privilege ACLs", "Required", "Prevents broken first sign-in and accidental exposure of user data."));
         SetupChecks.Add(new SetupCheck("Policies", "Password, lockout, and workstation logon policies documented", "Required", "Makes restrictions predictable before accounts are created."));
@@ -131,6 +179,69 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ValidateBulkUsers();
         ScriptPreviewBox.Text = BuildBulkUserScript();
         ActionTemplateGrid.SelectedIndex = 0;
+    }
+
+    private void RunLocalChecks_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _lastLocalSnapshot = _localEnvironment.Inspect();
+            RefreshEnvironmentChecks(_environmentReadiness.Evaluate(_lastLocalSnapshot));
+
+            var targetDomain = _lastLocalSnapshot.IsDomainJoined
+                ? _lastLocalSnapshot.JoinedDomain
+                : string.Empty;
+            _environmentProfile = _environmentProfile with { DomainName = targetDomain };
+            EnvironmentTarget = string.IsNullOrWhiteSpace(targetDomain)
+                ? "No joined domain detected."
+                : targetDomain;
+            EnvironmentNetworkState = "Local checks completed. No DNS, LDAP, Kerberos, event-log, or remote-computer request was sent.";
+            EnvironmentStatus = "Local checks only";
+            DiscoveryPreviewSummary = "Local checks are complete. Select Preview Domain Discovery to review future network activity; previewing does not execute it.";
+            DiscoveryPlanSteps.Clear();
+
+            AddAudit(
+                "Ran local environment checks",
+                "Info",
+                "Inspected local Windows, identity, DNS configuration, domain-join state, and RSAT files without network discovery.");
+            StatusMessage = "Local readiness checks completed. No domain controller or remote system was contacted.";
+        }
+        catch (Exception exception)
+        {
+            RefreshEnvironmentChecks(
+            [
+                new EnvironmentReadinessResult(
+                    "Local inspection",
+                    "Collect workstation readiness",
+                    EnvironmentReadinessStatus.Blocked,
+                    exception.GetType().Name,
+                    "The check failed safely. Review the local audit entry and retry after correcting workstation access.")
+            ]);
+            EnvironmentNetworkState = "Local inspection stopped safely. No domain discovery was attempted.";
+            AddAudit("Local environment check failed", "Error", exception.GetType().Name);
+            StatusMessage = "Local checks could not complete. Domain discovery remains unavailable.";
+        }
+    }
+
+    private void PreviewDomainDiscovery_Click(object sender, RoutedEventArgs e)
+    {
+        if (_lastLocalSnapshot is null)
+        {
+            StatusMessage = "Run Local Checks before creating a domain-discovery preview.";
+            return;
+        }
+
+        var preview = _environmentReadiness.BuildDiscoveryPreview(_environmentProfile, _lastLocalSnapshot);
+        DiscoveryPlanSteps.Clear();
+        foreach (var step in preview.Steps)
+        {
+            DiscoveryPlanSteps.Add(step);
+        }
+
+        DiscoveryPreviewSummary = preview.Summary;
+        EnvironmentNetworkState = "Preview created. No network request was sent and the active mode remains Demo.";
+        AddAudit("Previewed domain discovery", "Info", "Displayed a non-executable plan containing no write operation.");
+        StatusMessage = "Read-only discovery preview created. Nothing was executed.";
     }
 
     private void LoadSampleUsers_Click(object sender, RoutedEventArgs e)
@@ -418,6 +529,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         RefreshCounts();
+    }
+
+    private void RefreshEnvironmentChecks(IEnumerable<EnvironmentReadinessResult> results)
+    {
+        EnvironmentChecks.Clear();
+        foreach (var result in results)
+        {
+            EnvironmentChecks.Add(result);
+        }
     }
 
     private void RefreshCounts()

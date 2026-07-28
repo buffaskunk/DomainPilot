@@ -142,7 +142,7 @@
 
                         <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="20" Margin="0,0,18,0">
                             <DockPanel>
-                                <TextBlock DockPanel.Dock="Top" Text="Environment Readiness" FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
+                                <TextBlock DockPanel.Dock="Top" Text="Production Setup Checklist" FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
                                 <DataGrid ItemsSource="{Binding SetupChecks}" IsReadOnly="True">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Area" Binding="{Binding Area}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
@@ -160,6 +160,90 @@
                                 <TextBox Text="{Binding TrainingGuide, Mode=OneWay}" TextWrapping="Wrap" AcceptsReturn="True" IsReadOnly="True" BorderThickness="0" Background="#F8FAFC" Padding="14" VerticalScrollBarVisibility="Auto"/>
                             </DockPanel>
                         </Border>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Environment">
+                    <Grid Margin="0,18,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="16" Margin="0,0,0,12">
+                            <UniformGrid Rows="1" Columns="4">
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="Profile" Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock Text="{Binding EnvironmentProfileName}" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="Active Mode" Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock Text="{Binding EnvironmentProfileMode}" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="Target Domain" Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock Text="{Binding EnvironmentTarget}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding EnvironmentTarget}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="Controller Routing" Foreground="{StaticResource MutedBrush}"/>
+                                    <TextBlock Text="{Binding EnvironmentRouting}" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </UniformGrid>
+                        </Border>
+
+                        <Grid Grid.Row="1" Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <WrapPanel>
+                                <Button Content="Run Local Checks" Click="RunLocalChecks_Click"/>
+                                <Button Content="Preview Domain Discovery" Click="PreviewDomainDiscovery_Click" Background="#475467"/>
+                            </WrapPanel>
+                            <Border Grid.Column="1" Background="#EFF8FF" BorderBrush="#B2DDFF" BorderThickness="1" Padding="12,8" Margin="10,0,0,8">
+                                <TextBlock Text="{Binding EnvironmentNetworkState}" Foreground="#175CD3" TextWrapping="Wrap"/>
+                            </Border>
+                        </Grid>
+
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.2*"/>
+                                <ColumnDefinition Width="1*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="16" Margin="0,0,16,0">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top" Text="Local Readiness Results" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
+                                    <DataGrid ItemsSource="{Binding EnvironmentChecks}" IsReadOnly="True">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Area" Binding="{Binding Area}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Check" Binding="{Binding Check}" Width="6*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Evidence" Binding="{Binding Evidence}" Width="7*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Guidance" Binding="{Binding Guidance}" Width="8*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="16">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                                        <TextBlock Text="Read-Only Discovery Preview" FontSize="18" FontWeight="Bold"/>
+                                        <TextBlock Text="{Binding DiscoveryPreviewSummary}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <DataGrid ItemsSource="{Binding DiscoveryPlanSteps}" IsReadOnly="True">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="#" Binding="{Binding Order}" Width="40" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="3*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Proposed Operation" Binding="{Binding Operation}" Width="7*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                            <DataGridTextColumn Header="Expected Activity" Binding="{Binding ExpectedActivity}" Width="6*" ElementStyle="{StaticResource GridTextStyle}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
+                            </Border>
+                        </Grid>
                     </Grid>
                 </TabItem>
 

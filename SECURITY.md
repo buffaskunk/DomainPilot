@@ -8,6 +8,8 @@ DomainPilot is an administrative automation project. Do not run generated script
 
 This repository currently contains a dry-run prototype. It does not directly modify Active Directory. Generated PowerShell uses `-WhatIf` and should be reviewed before production adaptation.
 
+The Environment tab can perform explicitly requested local workstation checks. These checks use local Windows APIs and file-system reads and do not contact DNS, a domain controller, an event-log source, or another computer. The domain-discovery screen is currently a non-executable preview.
+
 ## Production Requirements
 
 - Use delegated AD groups for each action category.

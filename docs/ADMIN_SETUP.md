@@ -6,7 +6,7 @@ Use this as the checklist for turning the prototype into a controlled lab or pro
 
 - Install RSAT Active Directory tools.
 - Confirm the `ActiveDirectory` PowerShell module imports successfully.
-- Run RackAtlas as a delegated admin account.
+- Run DomainPilot as a delegated admin account.
 - Keep the operator workstation patched and protected.
 
 ## Active Directory
