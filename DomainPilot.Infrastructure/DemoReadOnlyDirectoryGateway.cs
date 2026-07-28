@@ -7,7 +7,9 @@ namespace DomainPilot.Infrastructure;
 /// <summary>
 /// Provides a complete fictional directory for training, UI testing, and public demonstrations.
 /// </summary>
-public sealed class DemoReadOnlyDirectoryGateway : IReadOnlyDirectoryGateway
+public sealed class DemoReadOnlyDirectoryGateway :
+    IReadOnlyDirectoryGateway,
+    IReadOnlyProvisioningReferenceGateway
 {
     private readonly IReadOnlyList<DemoDirectoryEntry> _entries = CreateEntries();
 
@@ -56,6 +58,39 @@ public sealed class DemoReadOnlyDirectoryGateway : IReadOnlyDirectoryGateway
             CreateSource()));
     }
 
+    public Task<ProvisioningReferenceSnapshot> ResolveAsync(
+        ProvisioningReferenceRequest request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // This emulates one bounded provider request so the application can exercise production
+        // batching behavior without contacting DNS, LDAP, a domain controller, or a workstation.
+        var accounts = FindRequestedValues(
+            request.AccountNames,
+            DirectoryObjectType.User,
+            entry => entry.Summary.AccountName);
+        var organizationalUnits = FindRequestedValues(
+            request.OrganizationalUnits,
+            DirectoryObjectType.OrganizationalUnit,
+            entry => entry.Summary.DistinguishedName);
+        var groups = FindRequestedValues(
+            request.Groups,
+            DirectoryObjectType.Group,
+            entry => entry.Summary.AccountName);
+        var workstations = FindRequestedValues(
+            request.Workstations,
+            DirectoryObjectType.Computer,
+            entry => entry.Summary.Name);
+
+        return Task.FromResult(new ProvisioningReferenceSnapshot(
+            accounts,
+            organizationalUnits,
+            groups,
+            workstations,
+            CreateSource()));
+    }
+
     private static bool Matches(DirectoryObjectSummary summary, string query)
     {
         return summary.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
@@ -73,6 +108,22 @@ public sealed class DemoReadOnlyDirectoryGateway : IReadOnlyDirectoryGateway
             DateTimeOffset.Now,
             AdministrationMode.Demo,
             IsSynthetic: true);
+    }
+
+    private IReadOnlyList<string> FindRequestedValues(
+        IEnumerable<string> requestedValues,
+        DirectoryObjectType objectType,
+        Func<DemoDirectoryEntry, string> valueSelector)
+    {
+        var knownValues = _entries
+            .Where(entry => entry.Summary.ObjectType == objectType)
+            .Select(valueSelector)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return requestedValues
+            .Where(knownValues.Contains)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static IReadOnlyList<DemoDirectoryEntry> CreateEntries()
@@ -120,6 +171,11 @@ public sealed class DemoReadOnlyDirectoryGateway : IReadOnlyDirectoryGateway
                 ("Network", "Last known IPv4", "10.20.44.91"),
                 ("Location", "AD site", "Building-B")),
             Entry(
+                new("demo-computer-training01", DirectoryObjectType.Computer, "PC-DEMO-001", "PC-DEMO-001$", "CN=PC-DEMO-001,OU=Training,OU=Workstations,DC=corp,DC=example,DC=com", "Enabled", "Fictional training workstation"),
+                ("Identity", "DNS host name", "pc-demo-001.corp.example.com"),
+                ("Operating system", "Name", "Windows 11 Enterprise"),
+                ("Location", "AD site", "Training-Lab")),
+            Entry(
                 new("demo-group-helpdesk", DirectoryObjectType.Group, "GG-HelpDesk", "GG-HelpDesk", "CN=GG-HelpDesk,OU=Role Groups,OU=Groups,DC=corp,DC=example,DC=com", "Security", "Delegated help desk role"),
                 ("Group", "Scope", "Global"),
                 ("Group", "Category", "Security"),
@@ -132,10 +188,33 @@ public sealed class DemoReadOnlyDirectoryGateway : IReadOnlyDirectoryGateway
                 ("Membership", "Demo direct members", "24"),
                 ("Governance", "Approval", "Manager and security team")),
             Entry(
+                new("demo-group-finance-apps", DirectoryObjectType.Group, "GG-FinanceApps", "GG-FinanceApps", "CN=GG-FinanceApps,OU=Role Groups,OU=Groups,DC=corp,DC=example,DC=com", "Security", "Fictional finance application entitlement"),
+                ("Group", "Scope", "Global"),
+                ("Group", "Category", "Security"),
+                ("Governance", "Owner", "Finance Applications")),
+            Entry(
+                new("demo-group-mfa", DirectoryObjectType.Group, "GG-MFA-Enforced", "GG-MFA-Enforced", "CN=GG-MFA-Enforced,OU=Access Groups,OU=Groups,DC=corp,DC=example,DC=com", "Security", "Fictional strong-authentication policy group"),
+                ("Group", "Scope", "Global"),
+                ("Group", "Category", "Security"),
+                ("Governance", "Owner", "Security Operations")),
+            Entry(
+                new("demo-group-standard", DirectoryObjectType.Group, "GG-Standard-Users", "GG-Standard-Users", "CN=GG-Standard-Users,OU=Role Groups,OU=Groups,DC=corp,DC=example,DC=com", "Security", "Fictional standard user baseline"),
+                ("Group", "Scope", "Global"),
+                ("Group", "Category", "Security"),
+                ("Governance", "Owner", "Identity Operations")),
+            Entry(
                 new("demo-ou-helpdesk-users", DirectoryObjectType.OrganizationalUnit, "HelpDesk Users", string.Empty, "OU=HelpDesk,OU=Users,DC=corp,DC=example,DC=com", "Managed", "Help desk user account container"),
                 ("Container", "Protected from deletion", "True"),
                 ("Delegation", "Administrative role", "GG-HelpDesk-Account-Operators"),
                 ("Policy", "Linked policy summary", "Help desk user baseline (demo)")),
+            Entry(
+                new("demo-ou-finance-users", DirectoryObjectType.OrganizationalUnit, "Finance Users", string.Empty, "OU=Finance,OU=Users,DC=corp,DC=example,DC=com", "Managed", "Finance user account container"),
+                ("Container", "Protected from deletion", "True"),
+                ("Policy", "Linked policy summary", "Finance user baseline (demo)")),
+            Entry(
+                new("demo-ou-staff-users", DirectoryObjectType.OrganizationalUnit, "Staff Users", string.Empty, "OU=Staff,OU=Users,DC=corp,DC=example,DC=com", "Managed", "Standard staff user account container"),
+                ("Container", "Protected from deletion", "True"),
+                ("Policy", "Linked policy summary", "Staff user baseline (demo)")),
             Entry(
                 new("demo-ou-workstations", DirectoryObjectType.OrganizationalUnit, "Workstations", string.Empty, "OU=Workstations,DC=corp,DC=example,DC=com", "Managed", "Workstation parent container"),
                 ("Container", "Protected from deletion", "True"),

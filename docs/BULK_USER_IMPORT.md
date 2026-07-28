@@ -28,8 +28,9 @@ The Markdown document explains the workflow; it is not an import file. DomainPil
 4. Read the import summary and correct structural errors.
 5. Review every row marked **Review**.
 6. Select **Validate Rows** after making grid edits.
-7. Export the review report for change approval when required.
-8. Generate the PowerShell plan and confirm every command still includes `-WhatIf`.
+7. Select **Check Demo Directory** to detect duplicates, existing accounts, and missing references.
+8. Export the review report or JSON approval package when change approval is required.
+9. Generate the PowerShell plan and confirm every command still includes `-WhatIf`.
 
 **Load Example** imports a separate training file containing two valid rows and one intentionally unsafe row. It exercises the same parser without requiring you to create a file.
 
@@ -37,4 +38,6 @@ DomainPilot limits one file to 5 MB and one batch to 5,000 structurally valid us
 
 ## Current Boundary
 
-CSV import, validation, review export, and PowerShell preview are implemented. Script execution is not implemented, and the desktop app remains in Demo mode.
+CSV import, validation, batched fictional-directory preflight, review export, approval-package
+export, and PowerShell preview are implemented. Script execution is not implemented, and the
+desktop app remains in Demo mode.

@@ -22,6 +22,8 @@ Rick Linville provides this software as-is and is not responsible or liable for 
 - UTF-8 CSV import with quoted-field support, required-schema checks, source-line tracking, and a 5,000-row batch limit.
 - Downloadable CSV template with fictional values for guided technician testing.
 - Technician review-report export for correcting and approving bulk changes.
+- Batched provisioning preflight for duplicate usernames, existing accounts, and missing OU, group, or workstation references.
+- JSON approval packages with batch identity, source evidence, row findings, dry-run commands, and rollback guidance.
 - Profile path, group membership, OU, and workstation restriction planning.
 - Dry-run PowerShell generation with `-WhatIf` guardrails.
 - User and device lookup concept for last known PC and IP address.
@@ -68,12 +70,13 @@ DomainPilot is split into focused projects:
 - `DomainPilot.Desktop`: WPF technician interface.
 - `DomainPilot.Tests`: lightweight validation, provider, UI-contract, persistence, and safety checks.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BULK_USER_IMPORT.md](docs/BULK_USER_IMPORT.md), [docs/DIRECTORY_EXPLORER.md](docs/DIRECTORY_EXPLORER.md), [docs/ENVIRONMENT_DISCOVERY.md](docs/ENVIRONMENT_DISCOVERY.md), and [docs/AI_COLLABORATION.md](docs/AI_COLLABORATION.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BULK_USER_IMPORT.md](docs/BULK_USER_IMPORT.md), [docs/BULK_PROVISIONING_PREFLIGHT.md](docs/BULK_PROVISIONING_PREFLIGHT.md), [docs/DIRECTORY_EXPLORER.md](docs/DIRECTORY_EXPLORER.md), [docs/ENVIRONMENT_DISCOVERY.md](docs/ENVIRONMENT_DISCOVERY.md), and [docs/AI_COLLABORATION.md](docs/AI_COLLABORATION.md).
 
 ## Roadmap
 
-- CSV template download and optional column mapping.
-- Persisted environment profiles and an explicitly approved read-only AD discovery provider.
+- Optional CSV column mapping and reusable provisioning presets.
+- Explicitly approved read-only Active Directory discovery and provisioning-reference providers.
+- Approval-package history and ticket/change-system integration.
 - Role-based action visibility.
 - PowerShell execution through constrained runspaces.
 - Windows Event Forwarding or SIEM connector for sign-in lookup.

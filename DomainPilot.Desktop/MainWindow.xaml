@@ -341,16 +341,22 @@
                             <Button Content="Save CSV Template" Click="SaveCsvTemplate_Click" Background="#475467"/>
                             <Button Content="Load Example" Click="LoadSampleUsers_Click" Background="#475467"/>
                             <Button Content="Validate Rows" Click="ValidateBulkUsers_Click"/>
+                            <Button Content="Check Demo Directory" Click="CheckProvisioningReferences_Click"/>
                             <Button Content="Generate PowerShell Plan" Click="GenerateBulkScript_Click"/>
                             <Button Content="Export Review Report" Click="ExportValidationReport_Click" Background="#475467"/>
+                            <Button Content="Export Approval Package" Click="ExportApprovalPackage_Click" Background="#475467"/>
                         </WrapPanel>
                         <Border Grid.Row="1" Background="#EFF8FF" BorderBrush="#B2DDFF" BorderThickness="1" Padding="12,8" Margin="0,0,0,12">
-                            <TextBlock Text="{Binding ImportSummary}" Foreground="#175CD3" TextWrapping="Wrap"/>
+                            <StackPanel>
+                                <TextBlock Text="{Binding ImportSummary}" Foreground="#175CD3" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding ProvisioningPreflightSummary}" Foreground="#344054" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                            </StackPanel>
                         </Border>
                         <DataGrid Grid.Row="2" ItemsSource="{Binding BulkUsers}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Row" Binding="{Binding SourceLine}" Width="55" IsReadOnly="True" ElementStyle="{StaticResource GridTextStyle}"/>
                                 <DataGridTextColumn Header="Status" Binding="{Binding ValidationStatus}" Width="70" IsReadOnly="True" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Directory" Binding="{Binding DirectoryStatus}" Width="80" IsReadOnly="True" ElementStyle="{StaticResource GridTextStyle}"/>
                                 <DataGridTextColumn Header="Username" Binding="{Binding SamAccountName}" Width="5*" ElementStyle="{StaticResource GridTextStyle}"/>
                                 <DataGridTextColumn Header="First" Binding="{Binding FirstName}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
                                 <DataGridTextColumn Header="Last" Binding="{Binding LastName}" Width="4*" ElementStyle="{StaticResource GridTextStyle}"/>
@@ -359,6 +365,7 @@
                                 <DataGridTextColumn Header="Profile Path" Binding="{Binding ProfilePath}" Width="8*" ElementStyle="{StaticResource GridTextStyle}"/>
                                 <DataGridTextColumn Header="Allowed PCs" Binding="{Binding AllowedWorkstations}" Width="6*" ElementStyle="{StaticResource GridTextStyle}"/>
                                 <DataGridTextColumn Header="Notes" Binding="{Binding ValidationMessage}" Width="9*" IsReadOnly="True" ElementStyle="{StaticResource GridTextStyle}"/>
+                                <DataGridTextColumn Header="Directory Findings" Binding="{Binding DirectoryMessage}" Width="9*" IsReadOnly="True" ElementStyle="{StaticResource GridTextStyle}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="14" Margin="0,14,0,0">

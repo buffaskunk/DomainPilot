@@ -10,6 +10,8 @@ var reportBuilder = new UserProvisioningValidationReportBuilder();
 var environmentReadiness = new EnvironmentReadinessService();
 var demoDirectory = new DemoReadOnlyDirectoryGateway();
 var directoryExplorer = new DirectoryExplorerService(demoDirectory);
+var provisioningPreflight = new BulkProvisioningPreflightService(demoDirectory, validator);
+var approvalPackageBuilder = new ProvisioningApprovalPackageBuilder();
 var failures = new List<string>();
 
 Assert("valid row is ready", () =>
@@ -220,6 +222,126 @@ Assert("demo directory returns categorized object details", () =>
             attribute.Name == "Last known IPv4");
 });
 
+Assert("packaged CSV template passes fictional directory preflight", () =>
+{
+    var templatePath = Path.Combine(AppContext.BaseDirectory, "samples", "bulk-users.template.csv");
+    using var stream = File.OpenRead(templatePath);
+    var imported = csvImporter.Import(stream);
+    var result = provisioningPreflight
+        .RunAsync(
+            imported.Rows.Select(row => new ProvisioningInputRow(row.SourceLine, row.Request)),
+            CancellationToken.None)
+        .GetAwaiter()
+        .GetResult();
+
+    return result.Rows.Count == 1
+        && result.Rows[0].IsReady
+        && result.Source.IsSynthetic
+        && result.ReadyCount == 1;
+});
+
+Assert("provisioning preflight blocks an existing account", () =>
+{
+    var result = provisioningPreflight
+        .RunAsync(
+            [new ProvisioningInputRow(2, ValidRequest())],
+            CancellationToken.None)
+        .GetAwaiter()
+        .GetResult();
+
+    return !result.Rows[0].IsReady
+        && result.Rows[0].Issues.Any(issue =>
+            issue.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase));
+});
+
+Assert("provisioning preflight identifies every missing directory reference", () =>
+{
+    var request = TemplateRequest() with
+    {
+        SamAccountName = "new.user",
+        OrganizationalUnit = "OU=Missing,OU=Users,DC=corp,DC=example,DC=com",
+        Groups = "GG-Missing",
+        AllowedWorkstations = "PC-MISSING-001"
+    };
+    var result = provisioningPreflight
+        .RunAsync(
+            [new ProvisioningInputRow(2, request)],
+            CancellationToken.None)
+        .GetAwaiter()
+        .GetResult();
+    var message = result.Rows[0].Message;
+
+    return !result.Rows[0].IsReady
+        && message.Contains("target OU", StringComparison.OrdinalIgnoreCase)
+        && message.Contains("GG-Missing", StringComparison.Ordinal)
+        && message.Contains("PC-MISSING-001", StringComparison.Ordinal);
+});
+
+Assert("provisioning preflight detects duplicate usernames with one provider call", () =>
+{
+    var gateway = new RecordingProvisioningReferenceGateway();
+    var service = new BulkProvisioningPreflightService(gateway, validator);
+    var first = TemplateRequest() with { SamAccountName = "duplicate.user" };
+    var second = TemplateRequest() with { SamAccountName = "DUPLICATE.USER" };
+    var result = service
+        .RunAsync(
+            [
+                new ProvisioningInputRow(2, first),
+                new ProvisioningInputRow(3, second)
+            ],
+            CancellationToken.None)
+        .GetAwaiter()
+        .GetResult();
+
+    return gateway.CallCount == 1
+        && gateway.LastRequest?.AccountNames.Count == 1
+        && result.Rows.All(row =>
+            !row.IsReady
+            && row.Message.Contains("more than once", StringComparison.OrdinalIgnoreCase));
+});
+
+Assert("provisioning preflight converts provider cancellation into a timeout", () =>
+{
+    var service = new BulkProvisioningPreflightService(
+        new SlowProvisioningReferenceGateway(),
+        validator,
+        TimeSpan.FromMilliseconds(20));
+    try
+    {
+        service
+            .RunAsync(
+                [new ProvisioningInputRow(2, TemplateRequest())],
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        return false;
+    }
+    catch (TimeoutException)
+    {
+        return true;
+    }
+});
+
+Assert("approval package contains dry-run evidence and no embedded secret", () =>
+{
+    var result = provisioningPreflight
+        .RunAsync(
+            [new ProvisioningInputRow(2, TemplateRequest())],
+            CancellationToken.None)
+        .GetAwaiter()
+        .GetResult();
+    var validations = result.Rows.Select(row =>
+        new UserProvisioningValidationResult(row.Request, row.Issues));
+    var script = planBuilder.BuildBulkUserPlan(validations);
+    var package = approvalPackageBuilder.Build(result, script);
+
+    return package.Contains("\"rollbackGuidance\"", StringComparison.Ordinal)
+        && package.Contains("\"batchId\"", StringComparison.Ordinal)
+        && package.Contains("-WhatIf", StringComparison.Ordinal)
+        && package.Contains("dry-run review artifact", StringComparison.OrdinalIgnoreCase)
+        && !package.Contains("Secret123!", StringComparison.Ordinal);
+});
+
 Assert("directory explorer blocks one-character broad searches", () =>
 {
     try
@@ -364,6 +486,18 @@ static UserProvisioningRequest ValidRequest()
         "HD-PC-014;HD-PC-019");
 }
 
+static UserProvisioningRequest TemplateRequest()
+{
+    return new UserProvisioningRequest(
+        "sample.user",
+        "Sample",
+        "User",
+        "OU=Staff,OU=Users,DC=corp,DC=example,DC=com",
+        "GG-Standard-Users",
+        @"\\files01\profiles\sample.user",
+        "PC-DEMO-001");
+}
+
 static MemoryStream CsvStream(string content)
 {
     return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
@@ -402,5 +536,54 @@ sealed class SlowReadOnlyDirectoryGateway : IReadOnlyDirectoryGateway
         CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
+    }
+}
+
+sealed class RecordingProvisioningReferenceGateway : IReadOnlyProvisioningReferenceGateway
+{
+    public AdministrationMode Mode => AdministrationMode.Demo;
+
+    public int CallCount { get; private set; }
+
+    public ProvisioningReferenceRequest? LastRequest { get; private set; }
+
+    public Task<ProvisioningReferenceSnapshot> ResolveAsync(
+        ProvisioningReferenceRequest request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        CallCount++;
+        LastRequest = request;
+
+        return Task.FromResult(new ProvisioningReferenceSnapshot(
+            [],
+            request.OrganizationalUnits,
+            request.Groups,
+            request.Workstations,
+            TestSource()));
+    }
+
+    private static DirectoryDataSource TestSource()
+    {
+        return new DirectoryDataSource(
+            "Recording test provider",
+            "Fictional test directory",
+            "TEST-DC-01",
+            DateTimeOffset.Parse("2026-01-01T12:00:00Z"),
+            AdministrationMode.Demo,
+            IsSynthetic: true);
+    }
+}
+
+sealed class SlowProvisioningReferenceGateway : IReadOnlyProvisioningReferenceGateway
+{
+    public AdministrationMode Mode => AdministrationMode.Demo;
+
+    public async Task<ProvisioningReferenceSnapshot> ResolveAsync(
+        ProvisioningReferenceRequest request,
+        CancellationToken cancellationToken)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        throw new InvalidOperationException("The timeout test should cancel before this line.");
     }
 }

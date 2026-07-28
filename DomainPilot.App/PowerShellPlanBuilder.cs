@@ -25,14 +25,14 @@ public sealed class PowerShellPlanBuilder
             builder.AppendLine($"# {displayName} ({user.SamAccountName})");
             builder.AppendLine($"New-ADUser -SamAccountName '{Escape(user.SamAccountName)}' -Name '{Escape(displayName)}' -GivenName '{Escape(user.FirstName)}' -Surname '{Escape(user.LastName)}' -Path '{Escape(user.OrganizationalUnit)}' -AccountPassword $TemporaryPassword -Enabled $true -ChangePasswordAtLogon $true -ProfilePath '{Escape(user.ProfilePath)}' -WhatIf");
 
-            foreach (var group in SplitMultiValue(user.Groups))
+            foreach (var group in MultiValueParser.Parse(user.Groups))
             {
                 builder.AppendLine($"Add-ADGroupMember -Identity '{Escape(group)}' -Members '{Escape(user.SamAccountName)}' -WhatIf");
             }
 
             if (!string.IsNullOrWhiteSpace(user.AllowedWorkstations))
             {
-                var workstations = string.Join(",", SplitMultiValue(user.AllowedWorkstations));
+                var workstations = string.Join(",", MultiValueParser.Parse(user.AllowedWorkstations));
                 builder.AppendLine($"Set-ADUser -Identity '{Escape(user.SamAccountName)}' -LogonWorkstations '{Escape(workstations)}' -WhatIf");
             }
 
@@ -45,11 +45,6 @@ public sealed class PowerShellPlanBuilder
         }
 
         return builder.ToString();
-    }
-
-    private static IEnumerable<string> SplitMultiValue(string value)
-    {
-        return value.Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static string Escape(string value)

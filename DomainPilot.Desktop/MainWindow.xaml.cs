@@ -21,11 +21,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly ILocalEnvironmentInspector _localEnvironment = new WindowsLocalEnvironmentInspector();
     private readonly IEnvironmentProfileStore _environmentProfileStore = new JsonEnvironmentProfileStore();
     private readonly EnvironmentProfileValidator _environmentProfileValidator = new();
-    private readonly DirectoryExplorerService _directoryExplorer = new(new DemoReadOnlyDirectoryGateway());
+    private readonly DemoReadOnlyDirectoryGateway _demoDirectory;
+    private readonly DirectoryExplorerService _directoryExplorer;
+    private readonly BulkProvisioningPreflightService _provisioningPreflight;
+    private readonly ProvisioningApprovalPackageBuilder _approvalPackageBuilder = new();
     private readonly IActiveDirectoryGateway _activeDirectory = new DemoActiveDirectoryGateway();
     private readonly IAuditLogService _auditLog;
     private CancellationTokenSource? _directorySearchCancellation;
     private CancellationTokenSource? _directoryDetailsCancellation;
+    private CancellationTokenSource? _provisioningPreflightCancellation;
     private EnvironmentProfile _environmentProfile = new(
         "Local workstation",
         AdministrationMode.Demo,
@@ -44,9 +48,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _directorySearchSummary = "Search the fictional directory by name, account, description, or distinguished name.";
     private string _directorySourceSummary = "Provider: Demo read-only directory. No domain or network source is connected.";
     private string _directorySelectedObject = "Select a result to inspect its directory attributes.";
+    private string _provisioningPreflightSummary = "Directory references have not been checked. The connected provider is fictional demo data.";
 
     public MainWindow()
     {
+        _demoDirectory = new DemoReadOnlyDirectoryGateway();
+        _directoryExplorer = new DirectoryExplorerService(_demoDirectory);
+        _provisioningPreflight = new BulkProvisioningPreflightService(_demoDirectory, _validator);
         InitializeComponent();
         _auditLog = new InMemoryAuditLogService(OperatorName);
         DataContext = this;
@@ -148,6 +156,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         get => _directorySelectedObject;
         set => SetField(ref _directorySelectedObject, value);
+    }
+
+    public string ProvisioningPreflightSummary
+    {
+        get => _provisioningPreflightSummary;
+        set => SetField(ref _provisioningPreflightSummary, value);
     }
 
     public int QueuedUserCount => BulkUsers.Count;
@@ -508,12 +522,62 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         StatusMessage = $"{ValidUserCount} ready row(s), {QueuedUserCount - ValidUserCount} row(s) need review.";
     }
 
-    private void GenerateBulkScript_Click(object sender, RoutedEventArgs e)
+    private async void CheckProvisioningReferences_Click(object sender, RoutedEventArgs e)
     {
-        ValidateBulkUsers();
-        ScriptPreviewBox.Text = BuildBulkUserScript();
+        await RunProvisioningPreflightAsync();
+    }
+
+    private async void GenerateBulkScript_Click(object sender, RoutedEventArgs e)
+    {
+        var preflight = await RunProvisioningPreflightAsync();
+        if (preflight is null)
+        {
+            return;
+        }
+
+        ScriptPreviewBox.Text = BuildBulkUserScript(preflight);
         AddAudit("Generated PowerShell plan", "Info", "Created dry-run provisioning script preview with -WhatIf.");
-        StatusMessage = "Generated a safe PowerShell plan. Review it before adapting for production.";
+        StatusMessage = $"Generated a dry-run plan for {preflight.ReadyCount} preflight-ready row(s).";
+    }
+
+    private async void ExportApprovalPackage_Click(object sender, RoutedEventArgs e)
+    {
+        var preflight = await RunProvisioningPreflightAsync();
+        if (preflight is null)
+        {
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export DomainPilot provisioning approval package",
+            FileName = $"domainpilot-approval-{preflight.BatchId}.json",
+            Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+            AddExtension = true,
+            DefaultExt = ".json"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            StatusMessage = "Approval package export cancelled.";
+            return;
+        }
+
+        try
+        {
+            var script = BuildBulkUserScript(preflight);
+            File.WriteAllText(dialog.FileName, _approvalPackageBuilder.Build(preflight, script));
+            AddAudit(
+                "Exported provisioning approval package",
+                "Info",
+                $"{preflight.BatchId}: {preflight.ReadyCount} ready, {preflight.ReviewCount} review.");
+            StatusMessage = $"Approval package exported to {dialog.FileName}.";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            AddAudit("Approval package export failed", "Error", exception.GetType().Name);
+            StatusMessage = "The approval package could not be written. Check the destination and try again.";
+        }
     }
 
     private void ExportValidationReport_Click(object sender, RoutedEventArgs e)
@@ -605,15 +669,105 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             var result = _validator.Validate(user.ToRequest());
             user.ValidationStatus = result.Status;
             user.ValidationMessage = result.Message;
+            user.DirectoryStatus = "Not checked";
+            user.DirectoryMessage = "Run Check Demo Directory to resolve account, OU, group, and workstation references.";
         }
 
+        ProvisioningPreflightSummary = "Local validation complete. Directory references have not been checked.";
         RefreshCounts();
     }
 
-    private string BuildBulkUserScript()
+    private string BuildBulkUserScript(ProvisioningBatchPreflightResult? preflight = null)
     {
-        var results = BulkUsers.Select(user => _validator.Validate(user.ToRequest()));
+        var results = preflight is null
+            ? BulkUsers.Select(user => _validator.Validate(user.ToRequest()))
+            : preflight.Rows.Select(row =>
+                new UserProvisioningValidationResult(row.Request, row.Issues));
         return _planBuilder.BuildBulkUserPlan(results);
+    }
+
+    private async Task<ProvisioningBatchPreflightResult?> RunProvisioningPreflightAsync()
+    {
+        ValidateBulkUsers();
+        _provisioningPreflightCancellation?.Cancel();
+        _provisioningPreflightCancellation?.Dispose();
+        _provisioningPreflightCancellation = new CancellationTokenSource();
+
+        ProvisioningPreflightSummary = "Checking fictional demo directory references in one read-only batch...";
+        StatusMessage = "Provisioning preflight is running against fictional demo data.";
+
+        try
+        {
+            var inputRows = BulkUsers.Select(user =>
+                new ProvisioningInputRow(user.SourceLine, user.ToRequest()));
+            var result = await _provisioningPreflight.RunAsync(
+                inputRows,
+                _provisioningPreflightCancellation.Token);
+            foreach (var rowResult in result.Rows)
+            {
+                var user = BulkUsers.First(row => row.SourceLine == rowResult.SourceLine);
+                user.ValidationStatus = rowResult.Status;
+                user.ValidationMessage = rowResult.Message;
+                user.DirectoryStatus = rowResult.Issues.Any(issue =>
+                    issue.Severity == ValidationSeverity.Error && IsDirectoryFinding(issue))
+                    ? "Review"
+                    : "Verified";
+                user.DirectoryMessage = BuildDirectoryFindingSummary(rowResult);
+            }
+
+            ProvisioningPreflightSummary =
+                $"{result.BatchId}: {result.ReadyCount} ready, {result.ReviewCount} need review. " +
+                $"{FormatDirectorySource(result.Source)}. One batched read completed in {result.Duration.TotalMilliseconds:0} ms.";
+            AddAudit(
+                "Ran bulk provisioning preflight",
+                "Info",
+                $"{result.BatchId}: resolved {result.Rows.Count} row(s) with fictional demo data.");
+            StatusMessage = "Preflight complete. No workplace directory or network source was contacted.";
+            RefreshCounts();
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            ProvisioningPreflightSummary = "Provisioning preflight cancelled.";
+            StatusMessage = "Provisioning preflight cancelled without changing any environment.";
+        }
+        catch (TimeoutException exception)
+        {
+            ProvisioningPreflightSummary = exception.Message;
+            AddAudit("Provisioning preflight timed out", "Warning", exception.Message);
+            StatusMessage = "Provisioning preflight timed out safely.";
+        }
+        catch (ArgumentException exception)
+        {
+            ProvisioningPreflightSummary = exception.Message;
+            StatusMessage = "Provisioning preflight needs corrected input.";
+        }
+        catch (Exception exception)
+        {
+            ProvisioningPreflightSummary = $"Provisioning preflight failed safely: {exception.GetType().Name}.";
+            AddAudit("Provisioning preflight failed", "Error", exception.GetType().Name);
+            StatusMessage = "Provisioning preflight failed without changing any environment.";
+        }
+
+        return null;
+    }
+
+    private static string BuildDirectoryFindingSummary(ProvisioningPreflightRowResult result)
+    {
+        var directoryIssues = result.Issues
+            .Where(IsDirectoryFinding)
+            .Select(issue => issue.Message)
+            .ToList();
+
+        return directoryIssues.Count == 0
+            ? "Account is available and all requested directory references were found."
+            : string.Join(" ", directoryIssues);
+    }
+
+    private static bool IsDirectoryFinding(ValidationIssue issue)
+    {
+        return issue.Message.Contains("checked directory", StringComparison.OrdinalIgnoreCase)
+            || issue.Message.Contains("Profile share", StringComparison.OrdinalIgnoreCase);
     }
 
     private void LoadBundledSample(bool writeAudit)
@@ -781,6 +935,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _directorySearchCancellation?.Dispose();
         _directoryDetailsCancellation?.Cancel();
         _directoryDetailsCancellation?.Dispose();
+        _provisioningPreflightCancellation?.Cancel();
+        _provisioningPreflightCancellation?.Dispose();
         base.OnClosed(e);
     }
 
@@ -813,6 +969,8 @@ public sealed class ProvisioningRowViewModel : INotifyPropertyChanged
 {
     private string _validationStatus = "Pending";
     private string _validationMessage = "Not yet validated.";
+    private string _directoryStatus = "Not checked";
+    private string _directoryMessage = "Directory references have not been checked.";
 
     public ProvisioningRowViewModel(long sourceLine, string samAccountName, string firstName, string lastName, string organizationalUnit, string groups, string profilePath, string allowedWorkstations)
     {
@@ -854,6 +1012,18 @@ public sealed class ProvisioningRowViewModel : INotifyPropertyChanged
     {
         get => _validationMessage;
         set => SetField(ref _validationMessage, value);
+    }
+
+    public string DirectoryStatus
+    {
+        get => _directoryStatus;
+        set => SetField(ref _directoryStatus, value);
+    }
+
+    public string DirectoryMessage
+    {
+        get => _directoryMessage;
+        set => SetField(ref _directoryMessage, value);
     }
 
     public UserProvisioningRequest ToRequest()

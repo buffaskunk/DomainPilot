@@ -19,7 +19,7 @@ DomainPilot.Core
 Domain models and value objects with no UI or infrastructure dependencies.
 
 DomainPilot.App
-Use-case services, environment-readiness policy, CSV import, validation and review reporting, PowerShell plan generation, and interfaces.
+Use-case services, environment-readiness policy, CSV import, provisioning preflight, validation and review reporting, approval-package generation, PowerShell plan generation, and interfaces.
 
 DomainPilot.Infrastructure
 Gateway implementations for local Windows inspection, credential-free profile storage, demo directory data, audit logging, files, PowerShell, AD, and logs.
@@ -49,4 +49,17 @@ Core never depends on Desktop or Infrastructure. This keeps the business rules t
 3. Add configuration profiles for Demo, DryRun, and future Live. (Credential-free local profile implemented)
 4. Add read-only environment readiness checks. (Local-only checks and network preview implemented)
 5. Add a dry-run Active Directory gateway. (Read-only contracts and full demo provider implemented)
-6. Add live actions only after approval, audit, and rollback workflows are implemented.
+6. Add batched provisioning-reference checks and approval artifacts. (Demo provider and JSON approval package implemented)
+7. Add live actions only after role authorization, durable audit, confirmation, and tested rollback workflows are implemented.
+
+## Provisioning Read Boundary
+
+`BulkProvisioningPreflightService` depends on `IReadOnlyProvisioningReferenceGateway`. The
+interface can resolve existing account names, OUs, groups, and workstations, but cannot mutate
+them. It receives de-duplicated references for an entire batch so providers can use bounded,
+efficient directory queries.
+
+The WPF composition root currently supplies `DemoReadOnlyDirectoryGateway`, which serves both the
+Directory Explorer and provisioning preflight from the same fictional catalog. A future on-premises
+Active Directory implementation belongs in Infrastructure and must not be activated implicitly at
+application startup.

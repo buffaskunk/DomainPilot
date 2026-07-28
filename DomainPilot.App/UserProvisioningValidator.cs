@@ -46,9 +46,7 @@ public sealed class UserProvisioningValidator
             issues.Add(new ValidationIssue(nameof(request.Groups), "At least one approved role group is required.", ValidationSeverity.Error));
         }
 
-        foreach (var group in request.Groups.Split(
-                     [';', ','],
-                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var group in MultiValueParser.Parse(request.Groups))
         {
             if (BlockedBulkGroups.Contains(group, StringComparer.OrdinalIgnoreCase))
             {

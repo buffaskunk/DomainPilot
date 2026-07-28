@@ -12,6 +12,11 @@ The Environment tab can perform explicitly requested local workstation checks. T
 
 The Directory Explorer currently uses fictional demo data. Its shared gateway contract exposes read operations only, enforces bounded searches and timeouts, and records source information. The prepared Windows DC Locator provider is not connected to the desktop UI and requires an explicit approval flag before it can run.
 
+Bulk provisioning preflight also uses the fictional provider. It de-duplicates directory
+references and resolves one bounded batch, detects duplicate and existing usernames, and blocks
+missing OUs, groups, or workstations. Approval packages contain proposed dry-run commands and
+review findings but do not store a password, token, or reusable credential value.
+
 ## Production Requirements
 
 - Use delegated AD groups for each action category.
@@ -22,6 +27,7 @@ The Directory Explorer currently uses fictional demo data. Its shared gateway co
 - Block high-risk groups such as Domain Admins from bulk workflows unless an explicit privileged workflow is implemented.
 - Execute custom scripts only from trusted, signed locations.
 - Protect exported logs because they may contain usernames, device names, and IP addresses.
+- Protect approval packages because they describe proposed accounts, memberships, paths, and workstation restrictions.
 
 ## Reporting Issues
 
