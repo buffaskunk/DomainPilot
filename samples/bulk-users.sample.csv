@@ -1,0 +1,4 @@
+SamAccountName,FirstName,LastName,OrganizationalUnit,Groups,ProfilePath,AllowedWorkstations
+jmartinez,Jordan,Martinez,"OU=HelpDesk,OU=Users,DC=corp,DC=example,DC=com","GG-VPN;GG-HelpDesk","\\files01\profiles\jmartinez","HD-PC-014;HD-PC-019"
+akhan,Avery,Khan,"OU=Finance,OU=Users,DC=corp,DC=example,DC=com","GG-FinanceApps;GG-MFA-Enforced","\\files01\profiles\akhan","FIN-PC-022"
+temp.user,Temp,User,Users,"Domain Admins","C:\Profiles\temp.user",
