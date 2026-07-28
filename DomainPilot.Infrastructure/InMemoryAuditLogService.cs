@@ -4,6 +4,9 @@ using DomainPilot.Core;
 
 namespace DomainPilot.Infrastructure;
 
+/// <summary>
+/// Keeps the demo audit trail in memory while providing a spreadsheet-safe export for technician review.
+/// </summary>
 public sealed class InMemoryAuditLogService(string actor) : IAuditLogService
 {
     private readonly List<AuditEntry> _entries = [];
@@ -22,14 +25,14 @@ public sealed class InMemoryAuditLogService(string actor) : IAuditLogService
 
         foreach (var entry in _entries)
         {
-            builder.AppendLine($"{Csv(entry.Timestamp.ToString("O"))},{Csv(entry.Actor)},{Csv(entry.Action)},{Csv(entry.Severity)},{Csv(entry.Message)}");
+            builder.AppendLine(string.Join(",",
+                CsvCellEncoder.Encode(entry.Timestamp.ToString("O")),
+                CsvCellEncoder.Encode(entry.Actor),
+                CsvCellEncoder.Encode(entry.Action),
+                CsvCellEncoder.Encode(entry.Severity),
+                CsvCellEncoder.Encode(entry.Message)));
         }
 
         return builder.ToString();
-    }
-
-    private static string Csv(string value)
-    {
-        return $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
     }
 }

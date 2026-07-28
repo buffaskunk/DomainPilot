@@ -1,8 +1,11 @@
 using DomainPilot.App;
 using DomainPilot.Core;
+using DomainPilot.Infrastructure;
 
 var validator = new UserProvisioningValidator();
+var csvImporter = new UserProvisioningCsvImporter();
 var planBuilder = new PowerShellPlanBuilder();
+var reportBuilder = new UserProvisioningValidationReportBuilder();
 var failures = new List<string>();
 
 Assert("valid row is ready", () =>
@@ -32,6 +35,13 @@ Assert("privileged groups are blocked", () =>
     return !result.IsReady && result.Message.Contains("blocked from bulk workflows", StringComparison.OrdinalIgnoreCase);
 });
 
+Assert("missing person name requires review", () =>
+{
+    var request = ValidRequest() with { FirstName = string.Empty };
+    var result = validator.Validate(request);
+    return !result.IsReady && result.Message.Contains("First name is required", StringComparison.OrdinalIgnoreCase);
+});
+
 Assert("generated provisioning plan remains dry-run", () =>
 {
     var result = validator.Validate(ValidRequest());
@@ -39,6 +49,64 @@ Assert("generated provisioning plan remains dry-run", () =>
     return script.Contains("New-ADUser", StringComparison.Ordinal)
         && script.Contains("-WhatIf", StringComparison.Ordinal)
         && !script.Contains("Domain Admins", StringComparison.OrdinalIgnoreCase);
+});
+
+Assert("CSV import handles quoted distinguished names", () =>
+{
+    const string csv = """
+        SamAccountName,FirstName,LastName,OrganizationalUnit,Groups,ProfilePath,AllowedWorkstations
+        jmartinez,Jordan,Martinez,"OU=HelpDesk,OU=Users,DC=corp,DC=example,DC=com","GG-VPN;GG-HelpDesk","\\files01\profiles\jmartinez","HD-PC-014;HD-PC-019"
+        """;
+    using var stream = CsvStream(csv);
+    var result = csvImporter.Import(stream);
+    return result.Rows.Count == 1
+        && result.Rows[0].SourceLine == 2
+        && result.Rows[0].Request.OrganizationalUnit.Contains("DC=example", StringComparison.Ordinal);
+});
+
+Assert("CSV import rejects a missing required header", () =>
+{
+    const string csv = """
+        SamAccountName,FirstName,LastName,Groups,ProfilePath,AllowedWorkstations
+        jmartinez,Jordan,Martinez,GG-VPN,\\files01\profiles\jmartinez,HD-PC-014
+        """;
+    using var stream = CsvStream(csv);
+    var result = csvImporter.Import(stream);
+    return result.Rows.Count == 0
+        && result.Issues.Any(issue =>
+            issue.Field == "OrganizationalUnit"
+            && issue.Severity == ValidationSeverity.Error);
+});
+
+Assert("CSV import skips rows with the wrong column count", () =>
+{
+    const string csv = """
+        SamAccountName,FirstName,LastName,OrganizationalUnit,Groups,ProfilePath,AllowedWorkstations
+        jmartinez,Jordan
+        """;
+    using var stream = CsvStream(csv);
+    var result = csvImporter.Import(stream);
+    return result.Rows.Count == 0
+        && result.Issues.Any(issue => issue.Message.Contains("row was skipped", StringComparison.OrdinalIgnoreCase));
+});
+
+Assert("validation report neutralizes CSV formula-like values", () =>
+{
+    var request = ValidRequest() with { FirstName = "=Example" };
+    var result = validator.Validate(request);
+    var report = reportBuilder.Build([(2, result)]);
+    return report.Contains("\"'=Example\"", StringComparison.Ordinal)
+        && report.Contains("\"Safe to include in dry-run plan.\"", StringComparison.Ordinal);
+});
+
+Assert("audit report neutralizes CSV formula-like values", () =>
+{
+    var auditLog = new InMemoryAuditLogService("=operator");
+    auditLog.Add("+action", "Info", "@message");
+    var report = auditLog.ExportCsv();
+    return report.Contains("\"'=operator\"", StringComparison.Ordinal)
+        && report.Contains("\"'+action\"", StringComparison.Ordinal)
+        && report.Contains("\"'@message\"", StringComparison.Ordinal);
 });
 
 if (failures.Count > 0)
@@ -84,4 +152,9 @@ static UserProvisioningRequest ValidRequest()
         "GG-VPN;GG-HelpDesk",
         @"\\files01\profiles\jmartinez",
         "HD-PC-014;HD-PC-019");
+}
+
+static MemoryStream CsvStream(string content)
+{
+    return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
 }

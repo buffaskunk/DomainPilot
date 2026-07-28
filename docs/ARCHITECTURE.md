@@ -19,7 +19,7 @@ DomainPilot.Core
 Domain models and value objects with no UI or infrastructure dependencies.
 
 DomainPilot.App
-Use-case services, validation, PowerShell plan generation, and interfaces.
+Use-case services, CSV import, validation and review reporting, PowerShell plan generation, and interfaces.
 
 DomainPilot.Infrastructure
 Gateway implementations for demo data, audit logging, files, PowerShell, AD, and logs.
@@ -44,7 +44,7 @@ Core never depends on Desktop or Infrastructure. This keeps the business rules t
 ## First Production-Ready Milestones
 
 1. Keep demo mode as the default.
-2. Add real CSV import and row-level validation export.
+2. Add real CSV import and row-level validation export. (Implemented)
 3. Add configuration profiles for Demo, DryRun, and future Live.
 4. Add read-only environment readiness checks.
 5. Add a dry-run Active Directory gateway.

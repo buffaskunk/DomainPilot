@@ -151,17 +151,23 @@
                     <Grid Margin="0,18,0,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="2*"/>
                             <RowDefinition Height="1.2*"/>
                         </Grid.RowDefinitions>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                            <Button Content="Load Sample CSV" Click="LoadSampleUsers_Click"/>
+                            <Button Content="Import CSV" Click="ImportUsers_Click"/>
+                            <Button Content="Load Example" Click="LoadSampleUsers_Click" Background="#475467"/>
                             <Button Content="Validate Rows" Click="ValidateBulkUsers_Click"/>
                             <Button Content="Generate PowerShell Plan" Click="GenerateBulkScript_Click"/>
-                            <Button Content="Export Audit Log" Click="ExportAuditLog_Click" Background="#475467"/>
+                            <Button Content="Export Review Report" Click="ExportValidationReport_Click" Background="#475467"/>
                         </StackPanel>
-                        <DataGrid Grid.Row="1" ItemsSource="{Binding BulkUsers}">
+                        <Border Grid.Row="1" Background="#EFF8FF" BorderBrush="#B2DDFF" BorderThickness="1" Padding="12,8" Margin="0,0,0,12">
+                            <TextBlock Text="{Binding ImportSummary}" Foreground="#175CD3" TextWrapping="Wrap"/>
+                        </Border>
+                        <DataGrid Grid.Row="2" ItemsSource="{Binding BulkUsers}">
                             <DataGrid.Columns>
+                                <DataGridTextColumn Header="CSV Row" Binding="{Binding SourceLine}" Width="80" IsReadOnly="True"/>
                                 <DataGridTextColumn Header="Status" Binding="{Binding ValidationStatus}" Width="100"/>
                                 <DataGridTextColumn Header="Username" Binding="{Binding SamAccountName}" Width="120"/>
                                 <DataGridTextColumn Header="First" Binding="{Binding FirstName}" Width="120"/>
@@ -173,7 +179,7 @@
                                 <DataGridTextColumn Header="Notes" Binding="{Binding ValidationMessage}" Width="*"/>
                             </DataGrid.Columns>
                         </DataGrid>
-                        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="14" Margin="0,14,0,0">
+                        <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="14" Margin="0,14,0,0">
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Top" Text="Generated Script Preview" FontWeight="Bold" FontSize="16" Margin="0,0,0,8"/>
                                 <TextBox x:Name="ScriptPreviewBox" FontFamily="Consolas" FontSize="13" TextWrapping="NoWrap" AcceptsReturn="True" IsReadOnly="True" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"/>

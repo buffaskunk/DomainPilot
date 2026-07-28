@@ -17,6 +17,8 @@ Rick Linville provides this software as-is and is not responsible or liable for 
 ## What It Shows
 
 - Bulk user provisioning review with validation before script generation.
+- UTF-8 CSV import with quoted-field support, required-schema checks, source-line tracking, and a 5,000-row batch limit.
+- Technician review-report export for correcting and approving bulk changes.
 - Profile path, group membership, OU, and workstation restriction planning.
 - Dry-run PowerShell generation with `-WhatIf` guardrails.
 - User and device lookup concept for last known PC and IP address.
@@ -60,11 +62,11 @@ DomainPilot is split into focused projects:
 - `DomainPilot.Desktop`: WPF technician interface.
 - `DomainPilot.Tests`: lightweight validation and safety checks.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/AI_COLLABORATION.md](docs/AI_COLLABORATION.md).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BULK_USER_IMPORT.md](docs/BULK_USER_IMPORT.md), and [docs/AI_COLLABORATION.md](docs/AI_COLLABORATION.md).
 
 ## Roadmap
 
-- CSV import with schema mapping and row-level error export.
+- CSV template download and optional column mapping.
 - Active Directory service layer with mock, dry-run, and live providers.
 - Role-based action visibility.
 - PowerShell execution through constrained runspaces.

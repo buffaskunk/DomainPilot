@@ -20,9 +20,20 @@ public sealed class UserProvisioningValidator
             issues.Add(new ValidationIssue(nameof(request.SamAccountName), "Username must be 3-20 safe characters and start with a letter.", ValidationSeverity.Error));
         }
 
-        if (!request.OrganizationalUnit.StartsWith("OU=", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(request.FirstName))
         {
-            issues.Add(new ValidationIssue(nameof(request.OrganizationalUnit), "Use a full distinguished OU path.", ValidationSeverity.Error));
+            issues.Add(new ValidationIssue(nameof(request.FirstName), "First name is required.", ValidationSeverity.Error));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.LastName))
+        {
+            issues.Add(new ValidationIssue(nameof(request.LastName), "Last name is required.", ValidationSeverity.Error));
+        }
+
+        if (!request.OrganizationalUnit.StartsWith("OU=", StringComparison.OrdinalIgnoreCase)
+            || !request.OrganizationalUnit.Contains(",DC=", StringComparison.OrdinalIgnoreCase))
+        {
+            issues.Add(new ValidationIssue(nameof(request.OrganizationalUnit), "Use a full distinguished OU path including domain components.", ValidationSeverity.Error));
         }
 
         if (request.ProfilePath.Length > 0 && !request.ProfilePath.StartsWith(@"\\", StringComparison.Ordinal))
@@ -35,11 +46,13 @@ public sealed class UserProvisioningValidator
             issues.Add(new ValidationIssue(nameof(request.Groups), "At least one approved role group is required.", ValidationSeverity.Error));
         }
 
-        foreach (var blockedGroup in BlockedBulkGroups)
+        foreach (var group in request.Groups.Split(
+                     [';', ','],
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            if (request.Groups.Contains(blockedGroup, StringComparison.OrdinalIgnoreCase))
+            if (BlockedBulkGroups.Contains(group, StringComparer.OrdinalIgnoreCase))
             {
-                issues.Add(new ValidationIssue(nameof(request.Groups), $"Privileged group '{blockedGroup}' is blocked from bulk workflows.", ValidationSeverity.Error));
+                issues.Add(new ValidationIssue(nameof(request.Groups), $"Privileged group '{group}' is blocked from bulk workflows.", ValidationSeverity.Error));
             }
         }
 

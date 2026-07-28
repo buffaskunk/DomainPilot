@@ -14,11 +14,14 @@ namespace DomainPilot.Desktop;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private readonly UserProvisioningValidator _validator = new();
+    private readonly UserProvisioningCsvImporter _csvImporter = new();
     private readonly PowerShellPlanBuilder _planBuilder = new();
+    private readonly UserProvisioningValidationReportBuilder _reportBuilder = new();
     private readonly IActiveDirectoryGateway _activeDirectory = new DemoActiveDirectoryGateway();
     private readonly IAuditLogService _auditLog;
     private string _statusMessage = "Ready. Demo mode uses safe sample data and does not query your domain.";
     private string _lookupSummary = "Search a user to see likely last sign-in device, IP, and support context.";
+    private string _importSummary = "Load the bundled example or import a UTF-8 CSV file. No Active Directory actions run during import.";
 
     public MainWindow()
     {
@@ -54,6 +57,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public int AuditEventCount => AuditEvents.Count;
 
+    public string ImportSummary
+    {
+        get => _importSummary;
+        set => SetField(ref _importSummary, value);
+    }
+
     public string LookupSummary
     {
         get => _lookupSummary;
@@ -81,10 +90,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void SeedData()
     {
-        BulkUsers.Clear();
-        BulkUsers.Add(new ProvisioningRowViewModel("jmartinez", "Jordan", "Martinez", "OU=HelpDesk,OU=Users,DC=corp,DC=example,DC=com", "GG-VPN;GG-HelpDesk", @"\\files01\profiles\jmartinez", "HD-PC-014;HD-PC-019"));
-        BulkUsers.Add(new ProvisioningRowViewModel("akhan", "Avery", "Khan", "OU=Finance,OU=Users,DC=corp,DC=example,DC=com", "GG-FinanceApps;GG-MFA-Enforced", @"\\files01\profiles\akhan", "FIN-PC-022"));
-        BulkUsers.Add(new ProvisioningRowViewModel("temp.user", "Temp", "User", "Users", "Domain Admins", "C:\\Profiles\\temp.user", ""));
+        LoadBundledSample(writeAudit: false);
 
         SetupChecks.Clear();
         SetupChecks.Add(new SetupCheck("Workstation", "RSAT Active Directory module installed", "Planned", "Needed for Get-ADUser, New-ADUser, and group membership checks."));
@@ -129,9 +135,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void LoadSampleUsers_Click(object sender, RoutedEventArgs e)
     {
-        SeedData();
-        AddAudit("Loaded sample CSV", "Info", "Sample provisioning rows loaded for validation training.");
-        StatusMessage = "Sample CSV data loaded. Edit the grid or validate the rows.";
+        LoadBundledSample(writeAudit: true);
+    }
+
+    private void ImportUsers_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import DomainPilot bulk users",
+            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            StatusMessage = "CSV import cancelled.";
+            return;
+        }
+
+        ImportCsvFile(dialog.FileName, Path.GetFileName(dialog.FileName), writeAudit: true);
     }
 
     private void ValidateBulkUsers_Click(object sender, RoutedEventArgs e)
@@ -147,6 +170,30 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ScriptPreviewBox.Text = BuildBulkUserScript();
         AddAudit("Generated PowerShell plan", "Info", "Created dry-run provisioning script preview with -WhatIf.");
         StatusMessage = "Generated a safe PowerShell plan. Review it before adapting for production.";
+    }
+
+    private void ExportValidationReport_Click(object sender, RoutedEventArgs e)
+    {
+        ValidateBulkUsers();
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export DomainPilot bulk-user review",
+            FileName = $"domainpilot-user-review-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
+            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            StatusMessage = "Review report export cancelled.";
+            return;
+        }
+
+        var rows = BulkUsers.Select(user =>
+            (user.SourceLine, _validator.Validate(user.ToRequest())));
+        File.WriteAllText(dialog.FileName, _reportBuilder.Build(rows));
+        AddAudit("Exported bulk-user review", "Info", $"Wrote {BulkUsers.Count} reviewed row(s) to a technician-selected file.");
+        StatusMessage = $"Review report exported to {dialog.FileName}.";
     }
 
     private void LookupUser_Click(object sender, RoutedEventArgs e)
@@ -225,6 +272,94 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return _planBuilder.BuildBulkUserPlan(results);
     }
 
+    private void LoadBundledSample(bool writeAudit)
+    {
+        var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "bulk-users.sample.csv");
+        ImportCsvFile(samplePath, "bundled example", writeAudit);
+    }
+
+    private void ImportCsvFile(string filePath, string displayName, bool writeAudit)
+    {
+        try
+        {
+            using var stream = File.OpenRead(filePath);
+            var result = _csvImporter.Import(stream);
+
+            // A bad schema should not destroy a queue the technician may already have reviewed.
+            var hasFileLevelError = result.Issues.Any(issue =>
+                issue.Severity == ValidationSeverity.Error && !issue.SourceLine.HasValue);
+            if (hasFileLevelError || result.Rows.Count == 0)
+            {
+                ImportSummary = BuildImportSummary(displayName, result);
+                StatusMessage = $"Could not import {displayName}. The existing queue was preserved.";
+                if (writeAudit)
+                {
+                    AddAudit("CSV import rejected", "Warning", $"Rejected {displayName}: {ImportSummary}");
+                }
+
+                return;
+            }
+
+            BulkUsers.Clear();
+            foreach (var row in result.Rows)
+            {
+                BulkUsers.Add(ProvisioningRowViewModel.FromCsvRow(row));
+            }
+
+            ValidateBulkUsers();
+            ScriptPreviewBox.Text = BuildBulkUserScript();
+            ImportSummary = BuildImportSummary(displayName, result);
+            StatusMessage = $"Imported {BulkUsers.Count} row(s) from {displayName}. Review validation notes before generating a plan.";
+
+            if (writeAudit)
+            {
+                AddAudit("Imported bulk-user CSV", "Info", $"{displayName}: {result.Summary}");
+            }
+        }
+        catch (IOException exception)
+        {
+            ImportSummary = $"Import failed: {exception.Message}";
+            StatusMessage = "The CSV could not be opened. Check that it is not locked and that you have access.";
+            if (writeAudit)
+            {
+                AddAudit("CSV import failed", "Error", $"Could not read {displayName}: {exception.Message}");
+            }
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            ImportSummary = $"Import failed: {exception.Message}";
+            StatusMessage = "Access to the selected CSV was denied.";
+            if (writeAudit)
+            {
+                AddAudit("CSV import failed", "Error", $"Access denied for {displayName}.");
+            }
+        }
+        catch (Exception exception)
+        {
+            // File parsing is an operator-facing boundary; unexpected input must fail closed without closing the app.
+            ImportSummary = $"Import failed safely: {exception.Message}";
+            StatusMessage = "DomainPilot could not parse the selected CSV. The existing queue was preserved.";
+            if (writeAudit)
+            {
+                AddAudit("CSV import failed", "Error", $"Unexpected parser error for {displayName}: {exception.GetType().Name}.");
+            }
+        }
+    }
+
+    private static string BuildImportSummary(string displayName, UserProvisioningCsvImportResult result)
+    {
+        var details = result.Issues
+            .Take(3)
+            .Select(issue => issue.SourceLine.HasValue
+                ? $"Row {issue.SourceLine}: {issue.Message}"
+                : issue.Message);
+        var suffix = result.Issues.Count > 3
+            ? $" Plus {result.Issues.Count - 3} more issue(s)."
+            : string.Empty;
+
+        return $"{displayName}: {result.Summary} {string.Join(" ", details)}{suffix}".Trim();
+    }
+
     private void AddAudit(string action, string severity, string message)
     {
         _auditLog.Add(action, severity, message);
@@ -279,8 +414,9 @@ public sealed class ProvisioningRowViewModel : INotifyPropertyChanged
     private string _validationStatus = "Pending";
     private string _validationMessage = "Not yet validated.";
 
-    public ProvisioningRowViewModel(string samAccountName, string firstName, string lastName, string organizationalUnit, string groups, string profilePath, string allowedWorkstations)
+    public ProvisioningRowViewModel(long sourceLine, string samAccountName, string firstName, string lastName, string organizationalUnit, string groups, string profilePath, string allowedWorkstations)
     {
+        SourceLine = sourceLine;
         SamAccountName = samAccountName;
         FirstName = firstName;
         LastName = lastName;
@@ -291,6 +427,8 @@ public sealed class ProvisioningRowViewModel : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public long SourceLine { get; }
 
     public string SamAccountName { get; set; }
 
@@ -321,6 +459,20 @@ public sealed class ProvisioningRowViewModel : INotifyPropertyChanged
     public UserProvisioningRequest ToRequest()
     {
         return new UserProvisioningRequest(SamAccountName, FirstName, LastName, OrganizationalUnit, Groups, ProfilePath, AllowedWorkstations);
+    }
+
+    public static ProvisioningRowViewModel FromCsvRow(UserProvisioningCsvRow row)
+    {
+        var request = row.Request;
+        return new ProvisioningRowViewModel(
+            row.SourceLine,
+            request.SamAccountName,
+            request.FirstName,
+            request.LastName,
+            request.OrganizationalUnit,
+            request.Groups,
+            request.ProfilePath,
+            request.AllowedWorkstations);
     }
 
     private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

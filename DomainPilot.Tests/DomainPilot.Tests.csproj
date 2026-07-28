@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DomainPilot.App\DomainPilot.App.csproj" />
     <ProjectReference Include="..\DomainPilot.Core\DomainPilot.Core.csproj" />
+    <ProjectReference Include="..\DomainPilot.Infrastructure\DomainPilot.Infrastructure.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

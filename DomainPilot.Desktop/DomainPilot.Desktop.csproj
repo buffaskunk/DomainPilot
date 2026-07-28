@@ -13,4 +13,10 @@
     <ProjectReference Include="..\DomainPilot.Infrastructure\DomainPilot.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\samples\bulk-users.sample.csv"
+             Link="samples\bulk-users.sample.csv"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
