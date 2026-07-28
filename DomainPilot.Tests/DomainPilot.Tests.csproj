@@ -6,6 +6,12 @@
     <ProjectReference Include="..\DomainPilot.Infrastructure\DomainPilot.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\DomainPilot.Desktop\MainWindow.xaml"
+             Link="ui\MainWindow.xaml"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>

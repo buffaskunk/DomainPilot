@@ -141,7 +141,7 @@
                         <Border Grid.Row="1" Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="20">
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Top" Text="Technician Training Notes" FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
-                                <TextBox Text="{Binding TrainingGuide}" TextWrapping="Wrap" AcceptsReturn="True" IsReadOnly="True" BorderThickness="0" Background="#F8FAFC" Padding="14" VerticalScrollBarVisibility="Auto"/>
+                                <TextBox Text="{Binding TrainingGuide, Mode=OneWay}" TextWrapping="Wrap" AcceptsReturn="True" IsReadOnly="True" BorderThickness="0" Background="#F8FAFC" Padding="14" VerticalScrollBarVisibility="Auto"/>
                             </DockPanel>
                         </Border>
                     </Grid>

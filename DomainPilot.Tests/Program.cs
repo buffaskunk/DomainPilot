@@ -1,6 +1,7 @@
 using DomainPilot.App;
 using DomainPilot.Core;
 using DomainPilot.Infrastructure;
+using System.Xml.Linq;
 
 var validator = new UserProvisioningValidator();
 var csvImporter = new UserProvisioningCsvImporter();
@@ -107,6 +108,20 @@ Assert("audit report neutralizes CSV formula-like values", () =>
     return report.Contains("\"'=operator\"", StringComparison.Ordinal)
         && report.Contains("\"'+action\"", StringComparison.Ordinal)
         && report.Contains("\"'@message\"", StringComparison.Ordinal);
+});
+
+Assert("read-only text boxes do not write to view-model properties", () =>
+{
+    var xamlPath = Path.Combine(AppContext.BaseDirectory, "ui", "MainWindow.xaml");
+    var document = XDocument.Load(xamlPath);
+    XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+
+    return document
+        .Descendants(presentation + "TextBox")
+        .Where(element => string.Equals((string?)element.Attribute("IsReadOnly"), "True", StringComparison.OrdinalIgnoreCase))
+        .Select(element => (string?)element.Attribute("Text"))
+        .Where(text => text?.Contains("{Binding", StringComparison.Ordinal) == true)
+        .All(text => text!.Contains("Mode=OneWay", StringComparison.Ordinal));
 });
 
 if (failures.Count > 0)
