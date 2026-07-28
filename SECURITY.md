@@ -2,6 +2,8 @@
 
 DomainPilot is designed around least privilege, predictable technician workflows, and auditability.
 
+DomainPilot is an administrative automation project. Do not run generated scripts or future live actions against any environment unless you are authorized to do so and have tested the action in a lab first.
+
 ## Prototype Status
 
 This repository currently contains a dry-run prototype. It does not directly modify Active Directory. Generated PowerShell uses `-WhatIf` and should be reviewed before production adaptation.

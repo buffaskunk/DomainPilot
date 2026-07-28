@@ -2,7 +2,13 @@
 
 DomainPilot is a Windows desktop prototype for safer Active Directory help desk operations. It is built as a Visual Studio 2022 WPF app and is intended to demonstrate secure bulk administration workflows, technician training, auditability, and environment readiness checks.
 
-Author: `buffaskunk`
+Author and copyright holder: **Rick Linville** (`buffaskunk`)
+
+## Important Disclaimer
+
+DomainPilot is provided for portfolio, educational, lab, and authorized administrative use only. Active Directory and Windows administration tools can affect user access, security policies, computers, servers, and production environments. By downloading, inspecting, modifying, building, or using this project, you are responsible for understanding the code and testing it safely before use.
+
+Rick Linville provides this software as-is and is not responsible or liable for damage, data loss, downtime, misconfiguration, security incidents, account lockouts, unauthorized changes, or any other harm caused by use or misuse of this project. See [DISCLAIMER.md](DISCLAIMER.md) and [LICENSE](LICENSE).
 
 ## What It Shows
 
